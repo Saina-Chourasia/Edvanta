@@ -17,3 +17,6 @@ npm-debug.log*
 data/*.db
 data/*.db-shm
 data/*.db-wal
+backups/*.db
+backups/*.db-shm
+backups/*.db-wal

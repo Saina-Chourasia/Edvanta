@@ -61,11 +61,15 @@ export class AlertsService {
           const daySlots = slots.filter(s => s.weekday === dow);
 
           for (const slot of daySlots) {
-            // Check if a session was logged for this slot or subject on checkDate
+            // Check if a session was logged for this slot on checkDate
             const session = db.get(`
               SELECT id, status FROM teaching_sessions
-              WHERE session_date = ? AND (timetable_slot_id = ? OR subject_id = ?)
-            `, [checkDate, slot.id, slot.subject_id]);
+              WHERE session_date = ? AND (
+                timetable_slot_id = ?
+                OR (timetable_slot_id IS NULL AND subject_id = ? AND batch_name = ? AND campus_id = ?)
+              )
+              LIMIT 1
+            `, [checkDate, slot.id, slot.subject_id, slot.batch_name, sem.campus_id]);
 
             if (!session) {
               // Session was NOT logged!

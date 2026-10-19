@@ -49,14 +49,23 @@ export function requireCampusAccess(paramName = 'campusId') {
 export function requireSubjectAccess(paramName = 'subjectId') {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
-    if (req.user.role === 'ADMIN' || req.user.role === 'CAMPUS_MANAGER') return next();
+    if (req.user.role === 'ADMIN') return next();
 
     const targetSubjectId = req.params[paramName] || req.body[paramName] || req.query[paramName];
     if (!targetSubjectId) return next();
 
-    const subject = db.get(`SELECT id, faculty_id, name, code FROM subjects WHERE id = ?`, [targetSubjectId]);
+    const subject = db.get(`SELECT id, campus_id, faculty_id, name, code FROM subjects WHERE id = ?`, [targetSubjectId]);
     if (!subject) {
       return res.status(404).json({ error: `Subject ${targetSubjectId} not found.` });
+    }
+
+    if (req.user.role === 'CAMPUS_MANAGER') {
+      if (req.user.campus_id && req.user.campus_id !== subject.campus_id) {
+        return res.status(403).json({
+          error: `Access denied. You are only authorized to manage subjects in your assigned campus '${req.user.campus_id}'.`
+        });
+      }
+      return next();
     }
 
     if (req.user.role === 'FACULTY' && subject.faculty_id !== req.user.id) {

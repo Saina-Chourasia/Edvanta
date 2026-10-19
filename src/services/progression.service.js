@@ -210,8 +210,8 @@ export class ProgressionService {
       if (topic.planned_date && topic.planned_date <= today) {
         hoursThatShouldHaveBeenCoveredByToday += pHours;
 
-        // H. OVERDUE TOPICS: planned_date has passed (< today) and not fully covered
-        if (topic.status !== 'COMPLETED' && topic.status !== 'SKIPPED') {
+        // H. OVERDUE TOPICS: planned_date has strictly passed (< today) and not fully covered
+        if (topic.planned_date < today && topic.status !== 'COMPLETED' && topic.status !== 'SKIPPED') {
           overdueCount++;
           overdueTopicsList.push({
             id: topic.id,
@@ -269,7 +269,19 @@ export class ProgressionService {
         if (CalendarService.isWorkingDay(cur, subject.working_saturday_rule, holidaySet)) {
           const dow = CalendarService.getDayOfWeek(cur);
           if (weeklyHoursByDay[dow]) {
-            availableHours += weeklyHoursByDay[dow];
+            let dayHours = weeklyHoursByDay[dow];
+            // If evaluating today, subtract hours from sessions already logged for this subject today
+            // to avoid double-counting completed sessions as future available capacity
+            if (cur === today) {
+              const loggedToday = db.get(`
+                SELECT COALESCE(SUM(duration_hours), 0) as logged_hours
+                FROM teaching_sessions
+                WHERE subject_id = ? AND session_date = ? AND status != 'CANCELLED'
+              `, [subjectId, today]);
+              const alreadyLogged = loggedToday ? Number(loggedToday.logged_hours) : 0;
+              dayHours = Math.max(0, dayHours - alreadyLogged);
+            }
+            availableHours += dayHours;
           }
         }
         cur = CalendarService.addDays(cur, 1);
@@ -433,7 +445,19 @@ export class ProgressionService {
           while (cur <= dayBeforeExam) {
             if (CalendarService.isWorkingDay(cur, exam.working_saturday_rule, holidaySet)) {
               const dow = CalendarService.getDayOfWeek(cur);
-              if (slotMap[dow]) subjAvailHours += slotMap[dow];
+              if (slotMap[dow]) {
+                let dayHours = slotMap[dow];
+                if (cur === today) {
+                  const loggedToday = db.get(`
+                    SELECT COALESCE(SUM(duration_hours), 0) as logged_hours
+                    FROM teaching_sessions
+                    WHERE subject_id = ? AND session_date = ? AND status != 'CANCELLED'
+                  `, [subj.id, today]);
+                  const alreadyLogged = loggedToday ? Number(loggedToday.logged_hours) : 0;
+                  dayHours = Math.max(0, dayHours - alreadyLogged);
+                }
+                subjAvailHours += dayHours;
+              }
             }
             cur = CalendarService.addDays(cur, 1);
           }

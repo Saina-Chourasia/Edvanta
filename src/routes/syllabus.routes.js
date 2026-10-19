@@ -95,9 +95,19 @@ router.patch('/topics/:id', authenticate, (req, res) => {
     return res.status(404).json({ error: 'Topic not found.' });
   }
 
-  // Permission check: Admin, Campus Manager, or assigned Faculty
-  if (req.user.role === 'FACULTY') {
-    const subject = db.get(`SELECT faculty_id FROM subjects WHERE id = ?`, [topic.subject_id]);
+  const subject = db.get(`SELECT campus_id, faculty_id FROM subjects WHERE id = ?`, [topic.subject_id]);
+  if (!subject) {
+    return res.status(404).json({ error: 'Subject not found.' });
+  }
+
+  // Permission check: Admin, Campus Manager (own campus), or assigned Faculty
+  if (req.user.role === 'CAMPUS_MANAGER') {
+    if (req.user.campus_id && req.user.campus_id !== subject.campus_id) {
+      return res.status(403).json({
+        error: `Access denied: You can only update topics for subjects in your assigned campus '${req.user.campus_id}'.`
+      });
+    }
+  } else if (req.user.role === 'FACULTY') {
     if (subject.faculty_id !== req.user.id) {
       return res.status(403).json({ error: 'Access denied: You are not assigned to this subject.' });
     }

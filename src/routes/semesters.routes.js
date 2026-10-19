@@ -88,6 +88,12 @@ router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'
     return res.status(404).json({ error: 'Semester not found.' });
   }
 
+  if (req.user.role === 'CAMPUS_MANAGER' && req.user.campus_id && req.user.campus_id !== semester.campus_id) {
+    return res.status(403).json({
+      error: `Access denied. You can only add calendar events for your assigned campus '${req.user.campus_id}'.`
+    });
+  }
+
   const eventId = `ev_${semester.campus_id}_${event_date}_${Math.random().toString(36).substr(2, 4)}`;
 
   try {

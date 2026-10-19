@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS tracks (
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
+  phone TEXT UNIQUE,
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('ADMIN', 'CAMPUS_MANAGER', 'FACULTY', 'STUDENT')),
@@ -159,6 +160,33 @@ CREATE TABLE IF NOT EXISTS system_settings (
   description TEXT
 );
 
+-- Requirement 11: Real Attendance Management System
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+  id TEXT PRIMARY KEY,
+  timetable_slot_id TEXT REFERENCES timetable_slots(id) ON DELETE SET NULL,
+  subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  faculty_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  campus_id TEXT NOT NULL REFERENCES campuses(id) ON DELETE CASCADE,
+  batch_name TEXT NOT NULL,
+  session_date TEXT NOT NULL, -- YYYY-MM-DD
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  closed_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id TEXT PRIMARY KEY,
+  attendance_session_id TEXT NOT NULL REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  campus_id TEXT NOT NULL REFERENCES campuses(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK(status IN ('PRESENT', 'ABSENT', 'EXCUSED')),
+  marked_by TEXT NOT NULL CHECK(marked_by IN ('STUDENT', 'FACULTY', 'ADMIN')),
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(attendance_session_id, student_id)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_subjects_semester ON subjects(semester_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_campus ON subjects(campus_id);
@@ -169,3 +197,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_subject ON teaching_sessions(subject_id)
 CREATE INDEX IF NOT EXISTS idx_sessions_faculty ON teaching_sessions(faculty_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON teaching_sessions(session_date);
 CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(recipient_user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_att_sess_campus_batch ON attendance_sessions(campus_id, batch_name, is_active);
+CREATE INDEX IF NOT EXISTS idx_att_sess_faculty ON attendance_sessions(faculty_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_att_rec_session ON attendance_records(attendance_session_id);
+CREATE INDEX IF NOT EXISTS idx_att_rec_student ON attendance_records(student_id);

@@ -39,6 +39,17 @@ export class DatabaseService {
       const schemaSql = fs.readFileSync(schemaPath, 'utf8');
       this.db.exec(schemaSql);
     }
+    // Safe column migrations for existing SQLite databases
+    try {
+      const userColumns = this.db.prepare("PRAGMA table_info(users)").all();
+      const hasPhone = userColumns.some(col => col.name === 'phone');
+      if (!hasPhone) {
+        this.db.exec("ALTER TABLE users ADD COLUMN phone TEXT;");
+        this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone);");
+      }
+    } catch (e) {
+      // Table may not exist yet if fresh
+    }
   }
 
   // Returns array of objects

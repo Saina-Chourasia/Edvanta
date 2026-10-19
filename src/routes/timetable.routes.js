@@ -116,6 +116,12 @@ router.delete('/:id', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), (req
     return res.status(404).json({ error: 'Timetable slot not found.' });
   }
 
+  if (req.user.role === 'CAMPUS_MANAGER' && req.user.campus_id && req.user.campus_id !== slot.campus_id) {
+    return res.status(403).json({
+      error: `Access denied. You can only delete timetable slots for your assigned campus '${req.user.campus_id}'.`
+    });
+  }
+
   db.run(`DELETE FROM timetable_slots WHERE id = ?`, [req.params.id]);
   ProgressionService.generatePlannedTopicDates(slot.subject_id);
 

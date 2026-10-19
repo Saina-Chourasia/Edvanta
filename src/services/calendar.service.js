@@ -138,8 +138,20 @@ export class CalendarService {
   }
 
   /**
-   * Format decimal hours nicely (e.g. 0.8333 -> "0.83 hrs" or "50 mins")
+   * Format decimal hours nicely into hours and minutes
+   * e.g., 0.8333 -> "50 min", 1.0 -> "1 hr", 1.6667 -> "1 hr 40 min", 15.8333 -> "15 hrs 50 min"
    */
+  static formatDuration(decimalHours) {
+    if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '0 min';
+    const totalMinutes = Math.round(Number(decimalHours) * 60);
+    if (totalMinutes === 0) return '0 min';
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (hrs === 0) return `${mins} min`;
+    if (mins === 0) return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
+    return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'} ${mins} min`;
+  }
+
   static formatHours(hours, decimals = 2) {
     if (hours === null || hours === undefined || isNaN(hours)) return '0.00';
     return Number(hours).toFixed(decimals);

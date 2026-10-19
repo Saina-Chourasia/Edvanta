@@ -14,8 +14,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 // Lightweight CSV line parser handling quotes
 function parseCSV(text) {
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    return { headers: [], rows: [] };
+  }
   const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-  if (lines.length === 0) return [];
+  if (lines.length === 0) return { headers: [], rows: [] };
 
   const parseRow = (line) => {
     const row = [];
@@ -64,19 +67,37 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
   let csvContent = '';
   if (req.file) {
     csvContent = req.file.buffer.toString('utf8');
-  } else if (req.body.csvText) {
+  } else if (typeof req.body.csvText === 'string') {
     csvContent = req.body.csvText;
   } else {
     return res.status(400).json({ error: 'No CSV file or csvText payload provided.' });
   }
 
   const { headers, rows } = parseCSV(csvContent);
+  if (!headers || headers.length === 0) {
+    return res.status(400).json({ error: 'CSV file is empty or contains no valid rows.' });
+  }
+
   const requiredHeaders = ['semester_id', 'campus_id', 'event_date', 'event_type', 'title'];
   const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
   if (missingHeaders.length > 0) {
     return res.status(400).json({
       error: `CSV validation failed: Missing required header(s): ${missingHeaders.join(', ')}`
     });
+  }
+
+  if (!rows || rows.length === 0) {
+    return res.status(400).json({ error: 'CSV file contains headers but no data rows.' });
+  }
+
+  // Campus Manager boundary enforcement
+  if (req.user.role === 'CAMPUS_MANAGER') {
+    const invalidCampus = rows.find(r => r.campus_id && r.campus_id !== req.user.campus_id);
+    if (invalidCampus) {
+      return res.status(403).json({
+        error: `Access denied. Campus Manager can only import calendar events for assigned campus '${req.user.campus_id}'.`
+      });
+    }
   }
 
   const errors = [];
@@ -160,16 +181,34 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
 router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), upload.single('file'), (req, res) => {
   let csvContent = '';
   if (req.file) csvContent = req.file.buffer.toString('utf8');
-  else if (req.body.csvText) csvContent = req.body.csvText;
+  else if (typeof req.body.csvText === 'string') csvContent = req.body.csvText;
   else return res.status(400).json({ error: 'No CSV file or csvText payload provided.' });
 
   const { headers, rows } = parseCSV(csvContent);
+  if (!headers || headers.length === 0) {
+    return res.status(400).json({ error: 'CSV file is empty or contains no valid rows.' });
+  }
+
   const requiredHeaders = ['campus_id', 'track_id', 'semester_id', 'batch_name', 'subject_code', 'faculty_email', 'weekday', 'start_time', 'end_time'];
   const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
   if (missingHeaders.length > 0) {
     return res.status(400).json({
       error: `CSV validation failed: Missing required header(s): ${missingHeaders.join(', ')}`
     });
+  }
+
+  if (!rows || rows.length === 0) {
+    return res.status(400).json({ error: 'CSV file contains headers but no data rows.' });
+  }
+
+  // Campus Manager boundary enforcement
+  if (req.user.role === 'CAMPUS_MANAGER') {
+    const invalidCampus = rows.find(r => r.campus_id && r.campus_id !== req.user.campus_id);
+    if (invalidCampus) {
+      return res.status(403).json({
+        error: `Access denied. Campus Manager can only import timetables for assigned campus '${req.user.campus_id}'.`
+      });
+    }
   }
 
   const errors = [];
@@ -259,16 +298,36 @@ router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), 
 router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
   let csvContent = '';
   if (req.file) csvContent = req.file.buffer.toString('utf8');
-  else if (req.body.csvText) csvContent = req.body.csvText;
+  else if (typeof req.body.csvText === 'string') csvContent = req.body.csvText;
   else return res.status(400).json({ error: 'No CSV file or csvText payload provided.' });
 
   const { headers, rows } = parseCSV(csvContent);
+  if (!headers || headers.length === 0) {
+    return res.status(400).json({ error: 'CSV file is empty or contains no valid rows.' });
+  }
+
   const requiredHeaders = ['subject_code', 'unit_number', 'unit_name', 'topic_title', 'planned_hours', 'sequence_order', 'exam_scope'];
   const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
   if (missingHeaders.length > 0) {
     return res.status(400).json({
       error: `CSV validation failed: Missing required header(s): ${missingHeaders.join(', ')}`
     });
+  }
+
+  if (!rows || rows.length === 0) {
+    return res.status(400).json({ error: 'CSV file contains headers but no data rows.' });
+  }
+
+  // Campus Manager boundary enforcement
+  if (req.user.role === 'CAMPUS_MANAGER') {
+    for (const row of rows) {
+      const subj = db.get(`SELECT campus_id FROM subjects WHERE LOWER(code) = LOWER(?)`, [row.subject_code]);
+      if (subj && subj.campus_id !== req.user.campus_id) {
+        return res.status(403).json({
+          error: `Access denied. Campus Manager can only import syllabus for assigned campus '${req.user.campus_id}'.`
+        });
+      }
+    }
   }
 
   const errors = [];

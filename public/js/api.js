@@ -31,7 +31,9 @@ const API = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    // Only set Content-Type: application/json if there is a non-FormData body payload
+    // Do not add Content-Type to GET or HEAD requests that have no body
+    if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
       headers['Content-Type'] = 'application/json';
     }
 
@@ -66,15 +68,46 @@ const API = {
     }
   },
 
+  // Shared Duration-Formatting Utility (Requirement Part 6)
+  formatDuration(decimalHours) {
+    if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '0 min';
+    const totalMins = Math.round(Number(decimalHours) * 60);
+    if (totalMins <= 0) return '0 min';
+    const hrs = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} min`;
+    if (mins === 0) return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`;
+    return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'} ${mins} min`;
+  },
+
   // Auth
-  async login(email, password) {
+  async login(identifier, password) {
     const data = await this.request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ identifier, password })
     });
     this.setToken(data.token);
     this.setCurrentUser(data.user);
     return data;
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    return this.request('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+  },
+
+  async createUser(userData) {
+    return this.request('/api/auth/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  async getUsers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/api/auth/users${query ? '?' + query : ''}`);
   },
 
   async quickLogin(role, userId) {
@@ -240,7 +273,45 @@ const API = {
         body: JSON.stringify({ csvText: csvTextOrFormData })
       });
     }
+  },
+
+  // Attendance Management (Requirement 11)
+  async getActiveAttendanceSessions() {
+    return this.request('/api/attendance/sessions/active');
+  },
+
+  async startAttendanceSession(data) {
+    return this.request('/api/attendance/sessions/start', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async closeAttendanceSession(sessionId) {
+    return this.request(`/api/attendance/sessions/${sessionId}/close`, {
+      method: 'POST'
+    });
+  },
+
+  async submitAttendance(sessionId) {
+    return this.request('/api/attendance/submit', {
+      method: 'POST',
+      body: JSON.stringify({ attendance_session_id: sessionId })
+    });
+  },
+
+  async getAttendanceRecords(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/api/attendance/records${query ? '?' + query : ''}`);
+  },
+
+  async updateAttendanceRecord(id, data) {
+    return this.request(`/api/attendance/records/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   }
 };
 
 window.API = API;
+window.formatDuration = (hrs) => API.formatDuration(hrs);

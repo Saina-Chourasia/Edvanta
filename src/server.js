@@ -17,6 +17,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import examsRoutes from './routes/exams.routes.js';
 import alertsRoutes from './routes/alerts.routes.js';
 import importsRoutes from './routes/imports.routes.js';
+import attendanceRoutes from './routes/attendance.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +55,7 @@ app.use('/api/exams', examsRoutes);
 app.use('/api/alerts', alertsRoutes);
 app.use('/api/imports', importsRoutes);
 app.use('/api/exports', importsRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // Fallback to index.html for SPA client navigation
 app.use((req, res) => {

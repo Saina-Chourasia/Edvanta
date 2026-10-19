@@ -3,425 +3,1030 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EDVANTA — Course Progression Tracker</title>
+  <title>EDVANTA — MSOT Academic Progression Tracker</title>
   <meta name="description" content="EDVANTA: Real-time course progression tracker, syllabus delivery analytics, and exam readiness for MSOT. Every Hour Counts, Every Goal Matters.">
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <!-- Top Sticky Header -->
-  <header class="top-header">
-    <div class="top-bar-container">
-      <a href="#" class="brand-section" onclick="App.switchTab('dashboard')">
+  <!-- ========================================== -->
+  <!-- PUBLIC TOP NAVIGATION (Landing & Login)    -->
+  <!-- ========================================== -->
+  <header id="publicTopNav" class="public-top-nav">
+    <div class="public-top-nav-inner">
+      <a href="#" class="brand-section" onclick="App.showLandingPage(event)">
         <div class="brand-icon">E</div>
         <div class="brand-info">
-          <h1>EDVANTA <span style="font-size: 0.65rem; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); padding: 0.15rem 0.4rem; border-radius: 4px; color: #a5b4fc;">MSOT</span></h1>
+          <h1>EDVANTA <span class="brand-badge">MSOT</span></h1>
           <p>Every Hour Counts, Every Goal Matters.</p>
         </div>
       </a>
 
-      <div class="header-controls">
-        <!-- Active Simulation Date Indicator & Controls -->
-        <div class="sim-date-pill" title="Current simulated system time for calculations and alerts">
-          <span>🕒</span>
-          <span id="activeSimDateDisplay">2026-10-19</span>
-          <button id="btnAdvance2Days" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.65rem; border-radius: 4px; margin-left: 0.25rem;" title="Simulate time progression to test unlogged session alerts">
-            +2 Days
-          </button>
-          <button id="btnResetSim" class="btn-secondary" style="padding: 0.15rem 0.35rem; font-size: 0.65rem; border-radius: 4px;" title="Reset back to system clock">
-            ↺
-          </button>
+      <div class="public-nav-actions">
+        <div class="campuses-pill-group">
+          <span>🏛️</span>
+          <span>Campuses: <strong>HI-Tech</strong> • <strong>Jagannath</strong> • <strong>Rathinam</strong></span>
         </div>
-
-        <!-- 1-Click Role Switcher -->
-        <div class="role-badge-selector">
-          <span style="font-size: 0.75rem; margin-right: 0.2rem;">👤 Role:</span>
-          <select id="roleSwitcherSelect" title="Switch user role instantly for hackathon evaluation">
-            <option value="usr_admin">👑 Dean (Admin)</option>
-            <option value="usr_mgr_hitech">🏢 HI-Tech Campus Mgr</option>
-            <option value="usr_fac_thorne">👨‍🏫 Dr. Thorne (Faculty - CS)</option>
-            <option value="usr_fac_math">👨‍🏫 Dr. Ramanujan (Faculty - Math)</option>
-            <option value="usr_stu_aarav">🎓 Aarav (Student - Mirai)</option>
-          </select>
-        </div>
-
-        <!-- Notification Bell Icon -->
-        <button class="btn-icon" title="Missed Session Alerts & Escalations" onclick="App.switchTab('alerts')">
-          🔔
-          <span id="alertsBadge" class="badge-counter" style="display: none;">0</span>
+        <button type="button" class="btn-primary" onclick="App.showLoginView()">
+          Sign In to Portal →
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Navigation Tabs Bar -->
-  <nav class="nav-tabs-bar">
-    <div class="nav-tabs-container">
-      <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
-      <button class="nav-tab" data-tab="logger">⚡ Fast Session Logger (<60s)</button>
-      <button class="nav-tab" data-tab="exams">🎯 Exam Readiness</button>
-      <button class="nav-tab" data-tab="student">🎓 Student View</button>
-      <button class="nav-tab" data-tab="calendar">📅 Timetable & Calendar</button>
-      <button class="nav-tab" data-tab="alerts">🚨 Alerts & Escalations</button>
-      <button class="nav-tab" data-tab="imports">📁 CSV Import & Export</button>
-    </div>
-  </nav>
+  <!-- ========================================== -->
+  <!-- SECTION 2 & 3: BEAUTIFUL LANDING PAGE      -->
+  <!-- ========================================== -->
+  <main id="landingView" class="landing-view-wrapper">
+    <!-- Hero Section -->
+    <section class="landing-hero">
+      <div class="hero-pill-tag">
+        <span>✨</span>
+        <span>MSOT Educational Progression Platform</span>
+      </div>
+      <h1 class="landing-heading">Your Academic Journey, Clearly Tracked.</h1>
+      <p class="landing-desc">
+        Manage academic progression, track syllabus completion, organize timetables, and monitor attendance through one simple academic platform.
+      </p>
 
-  <!-- Main Application Body -->
-  <main class="main-wrapper">
-
-    <!-- ========================================== -->
-    <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
-    <!-- ========================================== -->
-    <section id="view-dashboard" class="tab-view-content">
-      
-      <!-- Rolled-up Track Status Warning Banner (Requirement 10.I) -->
-      <div id="rolledUpBanner" class="track-status-banner DANGER">
-        <div class="banner-left">
-          <span id="bannerBadge" class="banner-badge badge-danger">DANGER</span>
-          <div>
-            <div id="bannerTitle" class="banner-title">Loading Track Progression Status...</div>
-            <div id="bannerDesc" class="banner-desc">Analyzing planned vs delivered curriculum across 4 campuses...</div>
-          </div>
-        </div>
-        <div style="font-size: 0.75rem; color: var(--text-dim); text-align: right;">
-          Worst-case Rolled-up Model<br>
-          <span style="color: var(--accent-cyan); font-weight: 700;">Zero Masking Rule</span>
-        </div>
+      <div class="landing-hero-actions">
+        <button type="button" class="btn-primary" style="font-size: 1.05rem; padding: 0.85rem 1.85rem;" onclick="App.showLoginView()">
+          Access Your Portal →
+        </button>
+        <a href="#featureCardsSection" class="btn-secondary" style="font-size: 1.05rem; padding: 0.85rem 1.6rem;">
+          Explore Features ↓
+        </a>
       </div>
 
-      <!-- Filters Bar -->
-      <div class="filters-bar">
-        <div class="filter-group">
-          <label for="campusFilter">Campus:</label>
-          <select id="campusFilter" class="filter-select">
-            <option value="">All Campuses (4)</option>
-          </select>
-        </div>
-
-        <div class="filter-group">
-          <label for="trackFilter">Academic Track:</label>
-          <select id="trackFilter" class="filter-select">
-            <option value="">All Tracks</option>
-          </select>
-        </div>
-
-        <div class="filter-group">
-          <label for="semesterFilter">Semester / Batch:</label>
-          <select id="semesterFilter" class="filter-select">
-            <option value="">All Active Semesters</option>
-          </select>
-        </div>
-
-        <div style="margin-left: auto;">
-          <a href="/api/exports/export/progress-report" target="_blank" class="btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.8rem;">
-            📥 Export Report (CSV)
-          </a>
-        </div>
+      <div class="landing-highlights">
+        <div class="highlight-item">📈 Real-Time Syllabus Progression</div>
+        <div class="highlight-item">📅 Conflict-Free Master Timetables</div>
+        <div class="highlight-item">⏱️ Direct Faculty Attendance Logging</div>
+        <div class="highlight-item">🎯 Exam Readiness & Risk Forecasting</div>
       </div>
-
-      <!-- Key Performance Indicators (KPIs) -->
-      <div class="kpi-grid">
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Total Subjects</span>
-            <span>📚</span>
-          </div>
-          <div class="kpi-value" id="kpiTotalSubjects">0</div>
-          <div class="kpi-subtext">Active curriculum items</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>On Track (>=1.15)</span>
-            <span style="color: var(--accent-emerald);">🟢</span>
-          </div>
-          <div class="kpi-value" id="kpiOnTrack" style="color: var(--accent-emerald);">0</div>
-          <div class="kpi-subtext">Healthy progression buffer</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Tight (1.00-1.15)</span>
-            <span style="color: var(--accent-amber);">🟡</span>
-          </div>
-          <div class="kpi-value" id="kpiTight" style="color: var(--accent-amber);">0</div>
-          <div class="kpi-subtext">Minimal safety margin</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Danger (<1.00)</span>
-            <span style="color: var(--accent-rose);">🔴</span>
-          </div>
-          <div class="kpi-value" id="kpiDanger" style="color: var(--accent-rose);">0</div>
-          <div class="kpi-subtext">Early warning triggered</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Hours Coverage %</span>
-            <span>📊</span>
-          </div>
-          <div class="kpi-value" id="kpiCoveragePercent">0%</div>
-          <div class="kpi-subtext">Hour-weighted delivery</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Aggregate Buffer</span>
-            <span>⏱️</span>
-          </div>
-          <div class="kpi-value" id="kpiBufferRatio">0.00</div>
-          <div class="kpi-subtext">Available / Remaining</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Pace vs Plan</span>
-            <span>📈</span>
-          </div>
-          <div class="kpi-value" id="kpiPaceVsPlan">0.0 hrs</div>
-          <div class="kpi-subtext">Covered vs Expected by Today</div>
-        </div>
-
-        <div class="glass-card kpi-card">
-          <div class="kpi-header">
-            <span>Overdue Topics</span>
-            <span>⚠️</span>
-          </div>
-          <div class="kpi-value" id="kpiOverdueTopics">0</div>
-          <div class="kpi-subtext">Planned date has passed</div>
-        </div>
-      </div>
-
-      <!-- Charts Row -->
-      <div class="charts-grid">
-        <div class="glass-card">
-          <div class="chart-card-title">
-            <span>Course Hours Delivery Breakdown</span>
-            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: normal;">Planned vs Delivered vs Available</span>
-          </div>
-          <div class="chart-wrapper">
-            <canvas id="chartHoursOverview"></canvas>
-          </div>
-        </div>
-
-        <div class="glass-card">
-          <div class="chart-card-title">
-            <span>Health Distribution</span>
-            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: normal;">Track Status</span>
-          </div>
-          <div class="chart-wrapper">
-            <canvas id="chartStatusBreakdown"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Subjects Progression Table -->
-      <div class="glass-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <div>
-            <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff;">Subject Syllabus Progression & Buffer Analysis</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted);">Click "Trace" on any subject to inspect exact formulas and calendar calculations.</p>
-          </div>
-        </div>
-
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Campus / Batch</th>
-                <th>In Scope</th>
-                <th>Covered</th>
-                <th>Remaining</th>
-                <th>Available</th>
-                <th>Buffer Ratio</th>
-                <th>Coverage %</th>
-                <th>Pace vs Plan</th>
-                <th>Status & Trace</th>
-              </tr>
-            </thead>
-            <tbody id="dashboardSubjectsTableBody">
-              <!-- Rendered dynamically -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
     </section>
 
-    <!-- ========================================== -->
-    <!-- TAB 2: DAILY FACULTY SESSION LOGGER        -->
-    <!-- ========================================== -->
-    <section id="view-logger" class="tab-view-content" style="display: none;">
-      <div class="logger-card">
-        <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-cyan);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+    <!-- 5 Clickable Feature Cards (Section 3) -->
+    <section id="featureCardsSection">
+      <div class="feature-section-header">
+        <h2>Core Academic Capabilities</h2>
+        <p>Built specifically for MSOT administrators, faculty members, and students.</p>
+      </div>
+
+      <div class="feature-cards-grid">
+        <!-- Card 1: Academic Progression -->
+        <div class="feature-card" onclick="App.handleFeatureCardClick('curriculum')">
+          <div>
+            <div class="feature-card-icon">📈</div>
+            <div class="feature-card-title">Academic Progression</div>
+            <div class="feature-card-desc">
+              Track subject-wise syllabus completion and academic progress.
+            </div>
+          </div>
+          <div class="feature-card-footer">
+            <span>Explore Progression</span>
+            <span class="feature-card-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Timetable -->
+        <div class="feature-card" onclick="App.handleFeatureCardClick('calendar')">
+          <div>
+            <div class="feature-card-icon">📅</div>
+            <div class="feature-card-title">Timetable</div>
+            <div class="feature-card-desc">
+              View organized academic schedules and upcoming sessions.
+            </div>
+          </div>
+          <div class="feature-card-footer">
+            <span>View Timetables</span>
+            <span class="feature-card-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Attendance -->
+        <div class="feature-card" onclick="App.handleFeatureCardClick('attendance')">
+          <div>
+            <div class="feature-card-icon">⏱️</div>
+            <div class="feature-card-title">Attendance</div>
+            <div class="feature-card-desc">
+              Access attendance features according to the user's role and permissions.
+            </div>
+          </div>
+          <div class="feature-card-footer">
+            <span>Access Attendance</span>
+            <span class="feature-card-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Reports & Insights -->
+        <div class="feature-card" onclick="App.handleFeatureCardClick('dashboard')">
+          <div>
+            <div class="feature-card-icon">📊</div>
+            <div class="feature-card-title">Reports & Insights</div>
+            <div class="feature-card-desc">
+              Review authorized academic reports and progress summaries.
+            </div>
+          </div>
+          <div class="feature-card-footer">
+            <span>View Insights</span>
+            <span class="feature-card-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 5: Login to Your Portal -->
+        <div class="feature-card login-highlight" onclick="App.showLoginView()">
+          <div>
+            <div class="feature-card-icon">🔐</div>
+            <div class="feature-card-title">Login to Your Portal</div>
+            <div class="feature-card-desc">
+              Sign in as Admin, Faculty, or Student.
+            </div>
+          </div>
+          <div class="feature-card-footer">
+            <span>Choose Your Portal</span>
+            <span class="feature-card-arrow">→</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Campuses Showcase (Section 12) -->
+    <section class="campuses-showcase-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h3 style="color: var(--heading-deep-blue); font-size: 1.35rem;">MSOT Unified Campus Network</h3>
+          <p>Standardized curriculum delivery and pacing across all three regional campuses.</p>
+        </div>
+        <span class="status-pill complete">3 Active Campuses</span>
+      </div>
+
+      <div class="campuses-grid">
+        <div class="campus-box">
+          <div class="campus-box-icon">🏛️</div>
+          <div>
+            <div class="campus-box-title">HI-Tech Campus</div>
+            <div class="campus-box-subtitle">Code: HIT • Asia/Kolkata</div>
+          </div>
+        </div>
+        <div class="campus-box">
+          <div class="campus-box-icon">🏛️</div>
+          <div>
+            <div class="campus-box-title">Jagannath Campus</div>
+            <div class="campus-box-subtitle">Code: JAG • Asia/Kolkata</div>
+          </div>
+        </div>
+        <div class="campus-box">
+          <div class="campus-box-icon">🏛️</div>
+          <div>
+            <div class="campus-box-title">Rathinam Campus</div>
+            <div class="campus-box-subtitle">Code: RAT • Asia/Kolkata</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SECTION 4: LOGIN VIEW & 3 PORTAL CARDS     -->
+  <!-- ========================================== -->
+  <main id="loginView" class="login-view-wrapper" style="display: none;">
+    <div class="login-back-bar">
+      <button type="button" class="btn-secondary" onclick="App.showLandingPage()">
+        ← Back to Home
+      </button>
+      <span style="font-size: 0.85rem; color: var(--text-secondary);">EDVANTA Portal Authentication</span>
+    </div>
+
+    <div class="portal-selection-header">
+      <h2>Select Your Portal</h2>
+      <p>Choose your institutional role to access your dedicated academic dashboard.</p>
+    </div>
+
+    <!-- Exactly Three Portal Options (Section 4) -->
+    <div class="portal-cards-grid">
+      <div class="portal-option-card" id="portalCardAdmin" onclick="App.selectLoginPortal('ADMIN')">
+        <div class="portal-icon">👑</div>
+        <div class="portal-name">Admin Portal</div>
+        <div class="portal-target">Dean & Campus Administrators</div>
+      </div>
+
+      <div class="portal-option-card selected" id="portalCardFaculty" onclick="App.selectLoginPortal('FACULTY')">
+        <div class="portal-icon">👨‍🏫</div>
+        <div class="portal-name">Faculty Portal</div>
+        <div class="portal-target">Professors & Instructors</div>
+      </div>
+
+      <div class="portal-option-card" id="portalCardStudent" onclick="App.selectLoginPortal('STUDENT')">
+        <div class="portal-icon">🎓</div>
+        <div class="portal-name">Student Portal</div>
+        <div class="portal-target">Enrolled Students</div>
+      </div>
+    </div>
+
+    <!-- Login Form Card -->
+    <div class="login-card-container">
+      <div class="login-form-title">
+        <h3 id="loginPortalHeading">Sign In as Faculty</h3>
+        <p id="loginPortalSubtitle">Enter your registered email address or phone number</p>
+      </div>
+
+      <!-- Friendly Notice Banner -->
+      <div id="loginNoticeBanner" class="login-notice-banner" style="display: none;">
+        <span>ℹ️</span>
+        <span id="loginNoticeMessage">Please log in to access your portal.</span>
+      </div>
+
+      <!-- Error Banner -->
+      <div id="loginErrorBanner" class="login-error-banner" style="display: none;">
+        <span>⚠️</span>
+        <span id="loginErrorMessage">Invalid credentials.</span>
+      </div>
+
+      <form id="loginForm" onsubmit="event.preventDefault(); App.handleLogin();">
+        <div class="form-group">
+          <label class="form-label" for="loginIdentifier">Registered Email Address or Phone Number:</label>
+          <input type="text" id="loginIdentifier" class="form-input" placeholder="e.g. faculty.cs@edvanta.msot.edu or 9876543220" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+            <label class="form-label" for="loginPassword" style="margin: 0;">Password:</label>
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border: none;" onclick="App.togglePasswordVisibility('loginPassword')">
+              👁️ Show/Hide
+            </button>
+          </div>
+          <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="loginCampusSelect">Campus (Optional Filter):</label>
+          <select id="loginCampusSelect" class="form-select">
+            <option value="">All / Assigned Campus</option>
+            <option value="camp_hitech">HI-Tech Campus</option>
+            <option value="camp_juj">Jagannath Campus</option>
+            <option value="camp_ratnam">Rathinam Campus</option>
+          </select>
+        </div>
+
+        <button type="submit" id="btnLoginSubmit" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;">
+          Sign In to Portal →
+        </button>
+      </form>
+
+      <!-- Evaluator Quick-Fill Accounts Reference (Section 4 - Exactly 3 Entries) -->
+      <details class="demo-credentials-box">
+        <summary>
+          <span>🔑 Demo Accounts Reference (Click to view & autofill)</span>
+          <span>▼</span>
+        </summary>
+        <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+          Default password for all seeded accounts: <strong style="color: var(--heading-deep-blue);">edvanta123</strong>
+        </div>
+
+        <!-- 1. Admin Demo Account -->
+        <div class="demo-acc-item">
+          <div>
+            <strong>👑 Admin:</strong> Prof. Rajesh Sharma (Dean)
+            <div class="demo-desc">admin@edvanta.msot.edu • 9876543210</div>
+          </div>
+          <button type="button" class="demo-fill-btn" onclick="App.fillDemoLogin('admin@edvanta.msot.edu', 'edvanta123', 'ADMIN')">Autofill</button>
+        </div>
+
+        <!-- 2. Faculty Demo Account -->
+        <div class="demo-acc-item">
+          <div>
+            <strong>👨‍🏫 Faculty:</strong> Dr. Aris Thorne (CS)
+            <div class="demo-desc">faculty.cs@edvanta.msot.edu • 9876543220</div>
+          </div>
+          <button type="button" class="demo-fill-btn" onclick="App.fillDemoLogin('faculty.cs@edvanta.msot.edu', 'edvanta123', 'FACULTY')">Autofill</button>
+        </div>
+
+        <!-- 3. Student Demo Account -->
+        <div class="demo-acc-item">
+          <div>
+            <strong>🎓 Student:</strong> Aarav Mehta (Mirai Batch)
+            <div class="demo-desc">student.aarav@edvanta.msot.edu • 9876543230</div>
+          </div>
+          <button type="button" class="demo-fill-btn" onclick="App.fillDemoLogin('student.aarav@edvanta.msot.edu', 'edvanta123', 'STUDENT')">Autofill</button>
+        </div>
+      </details>
+    </div>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SECTION 6: AUTHENTICATED APP SHELL & SIDEBAR -->
+  <!-- ========================================== -->
+  <div id="appShell" class="app-shell" style="display: none;">
+    <!-- Backdrop for mobile drawer -->
+    <div id="mobileNavBackdrop" class="mobile-nav-backdrop" onclick="App.toggleSidebarMobile(false)"></div>
+
+    <!-- Left Sidebar -->
+    <aside id="appSidebar" class="app-sidebar">
+      <div>
+        <!-- Sidebar Brand Header -->
+        <div class="sidebar-header">
+          <a href="#" class="sidebar-brand" onclick="App.handleBrandClick(event)">
+            <div class="brand-icon" style="width: 32px; height: 32px; font-size: 1rem;">E</div>
+            <div class="sidebar-brand-text">
+              <span style="font-weight: 800; color: var(--heading-deep-blue); font-size: 1.05rem;">EDVANTA</span>
+              <span class="brand-badge">MSOT</span>
+            </div>
+          </a>
+          <button type="button" class="sidebar-toggle-btn" title="Toggle Sidebar" onclick="App.toggleSidebarDesktop()">
+            ⇋
+          </button>
+        </div>
+
+        <!-- User Profile Card -->
+        <div class="sidebar-user-card">
+          <div id="userAvatarCircle" class="sidebar-user-avatar">A</div>
+          <div class="sidebar-user-details">
+            <div id="userDisplayName" class="sidebar-user-name">Loading...</div>
+            <div id="userCampusDisplay" style="font-size: 0.72rem; color: var(--text-secondary);">Campus</div>
+            <div id="portalRoleBadge" class="sidebar-user-role-badge">ADMIN PORTAL</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Role Navigation Items -->
+        <nav id="sidebarNavContainer" class="sidebar-nav-container">
+          <!-- Populated dynamically by App.renderNavTabsForRole() -->
+        </nav>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button type="button" class="sidebar-footer-btn" onclick="App.showLandingPage()">
+          <span class="nav-icon">🌐</span>
+          <span>View Public Home</span>
+        </button>
+        <button type="button" class="sidebar-footer-btn" onclick="App.openChangePasswordModal()">
+          <span class="nav-icon">🔑</span>
+          <span>Change Password</span>
+        </button>
+        <button type="button" class="sidebar-footer-btn logout" onclick="App.handleLogout()">
+          <span class="nav-icon">🚪</span>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="app-main-content">
+      <!-- App Topbar -->
+      <header class="app-topbar">
+        <div class="app-topbar-left">
+          <button type="button" class="hamburger-btn" onclick="App.toggleSidebarMobile(true)">
+            ☰
+          </button>
+          <span id="currentPortalNamePill" class="portal-role-pill">👑 ADMIN PORTAL</span>
+        </div>
+
+        <div class="app-topbar-right">
+          <!-- Simulation Date Pill -->
+          <div class="sim-date-pill" id="simDatePillWrapper" title="Simulated date for pacing & alert checks">
+            <span>🕒</span>
+            <span id="activeSimDateDisplay">2026-10-19</span>
+            <button id="btnAdvance2Days" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.68rem; margin-left: 0.25rem;">+2 Days</button>
+            <button id="btnResetSim" class="btn-secondary" style="padding: 0.15rem 0.35rem; font-size: 0.68rem;">↺</button>
+          </div>
+
+          <!-- Alert Notification Bell -->
+          <button class="btn-icon" id="btnAlertsBell" title="Missed Session Alerts & Escalations" onclick="App.switchTab('alerts')">
+            🔔
+            <span id="alertsBadge" class="badge-counter" style="display: none; position: absolute; top: -4px; right: -4px; background: #EF4444; color: #fff; font-size: 0.65rem; font-weight: 800; border-radius: 50%; width: 16px; height: 16px; display: none; align-items: center; justify-content: center;">0</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Tab Content Container -->
+      <div class="app-content-body">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
+        <!-- ========================================== -->
+        <section id="view-dashboard" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
             <div>
-              <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Daily Session Logger</h2>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-                Ultra-fast mobile flow: Log your teaching session in under 60 seconds with pre-filled timetable & syllabus sequence.
+              <h2>Executive Academic Dashboard</h2>
+              <p>Real-time curriculum progression, pace vs plan, and zero-masking track health status.</p>
+            </div>
+            <div>
+              <a href="/api/exports/export/progress-report" target="_blank" class="btn-secondary">
+                📥 Export Academic CSV
+              </a>
+            </div>
+          </div>
+
+          <!-- Rolled-up Track Status Warning Banner -->
+          <div id="rolledUpBanner" class="track-status-banner DANGER">
+            <div class="banner-left">
+              <span id="bannerBadge" class="banner-badge badge-danger">DANGER</span>
+              <div>
+                <div id="bannerTitle" class="banner-title">Loading Track Progression Status...</div>
+                <div id="bannerDesc" class="banner-desc">Analyzing planned vs delivered curriculum across 3 campuses...</div>
+              </div>
+            </div>
+            <div style="font-size: 0.78rem; text-align: right; color: var(--text-secondary);">
+              Worst-case Rolled-up Model<br>
+              <strong style="color: var(--primary-blue);">Zero Masking Rule</strong>
+            </div>
+          </div>
+
+          <!-- Filters Bar -->
+          <div class="filters-bar">
+            <div class="filter-group">
+              <label for="campusFilter">Campus:</label>
+              <select id="campusFilter" class="filter-select">
+                <option value="">All Campuses (3)</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="trackFilter">Academic Track:</label>
+              <select id="trackFilter" class="filter-select">
+                <option value="">All Tracks</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="semesterFilter">Semester / Batch:</label>
+              <select id="semesterFilter" class="filter-select">
+                <option value="">All Active Semesters</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-card-label">Total In-Scope Hours</div>
+              <div id="kpiTotalHours" class="kpi-card-value">--</div>
+              <div class="kpi-card-desc">7 curriculum subjects</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-label">Covered Hours</div>
+              <div id="kpiCoveredHours" class="kpi-card-value" style="color: #10B981;">--</div>
+              <div class="kpi-card-desc">Delivered in teaching sessions</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-label">Remaining Hours</div>
+              <div id="kpiRemainingHours" class="kpi-card-value" style="color: #F59E0B;">--</div>
+              <div class="kpi-card-desc">Hours left to syllabus finish</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-label">Available Calendar Hours</div>
+              <div id="kpiAvailableHours" class="kpi-card-value" style="color: var(--primary-blue);">--</div>
+              <div class="kpi-card-desc">Before target finish date</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-label">Overall Buffer Ratio</div>
+              <div id="kpiBufferRatio" class="kpi-card-value">--</div>
+              <div class="kpi-card-desc">Available / Remaining (>1.1 On Track)</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-card-label">Overdue Topics</div>
+              <div id="kpiOverdueTopics" class="kpi-card-value" style="color: #EF4444;">--</div>
+              <div class="kpi-card-desc">Past planned date not complete</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3 style="font-size: 1rem; color: var(--heading-deep-blue); margin-bottom: 1rem;">Planned vs Covered vs Available Hours by Subject</h3>
+              <div class="chart-wrapper">
+                <canvas id="chartHoursOverview"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <h3 style="font-size: 1rem; color: var(--heading-deep-blue); margin-bottom: 1rem;">Track Health Breakdown</h3>
+              <div class="chart-wrapper">
+                <canvas id="chartStatusBreakdown"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subjects Progression Table -->
+          <div class="content-card">
+            <div class="card-title-bar">
+              <h3>7 Core Curriculum Subjects Progression</h3>
+              <span class="status-pill complete">Live Sync</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Track / Batch</th>
+                    <th>Planned</th>
+                    <th>Covered</th>
+                    <th>Remaining</th>
+                    <th>Available</th>
+                    <th>Progress %</th>
+                    <th>Buffer</th>
+                    <th>Pace vs Plan</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboardSubjectsTableBody">
+                  <tr><td colspan="10" style="text-align: center; padding: 2rem;">Loading curriculum analytics...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB: ATTENDANCE MANAGEMENT (Section 11)    -->
+        <!-- ========================================== -->
+        <section id="view-attendance" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Class Attendance Management System</h2>
+              <p>Session-based attendance authorization, student check-in, and auditable records.</p>
+            </div>
+            <div id="attendanceHeaderActions">
+              <!-- Rendered for Faculty/Admin -->
+            </div>
+          </div>
+
+          <!-- Active Attendance Session Banner (Student View) -->
+          <div id="studentActiveAttendanceCard" class="attendance-active-banner" style="display: none;">
+            <div>
+              <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                <span class="attendance-pulse-dot"></span>
+                <strong style="color: var(--heading-deep-blue); font-size: 1.1rem;" id="activeAttSubjectTitle">Active Class Attendance Session</strong>
+              </div>
+              <p id="activeAttFacultyInfo" style="margin: 0; font-size: 0.88rem; color: var(--text-secondary);">
+                Instructor initiated attendance. Click below to verify your presence.
               </p>
             </div>
-            <div id="loggerDateDisplay" style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--accent-cyan); font-size: 0.9rem;">
-              Today
+            <button type="button" id="btnSubmitStudentAttendance" class="btn-primary" style="padding: 0.75rem 1.75rem; font-size: 1rem;" onclick="App.submitCurrentAttendance()">
+              ✅ Mark Present Now
+            </button>
+          </div>
+
+          <!-- Attendance KPI Summary -->
+          <div class="attendance-summary-cards" id="attendanceSummaryRow">
+            <div class="attendance-summary-card">
+              <div class="att-card-icon">📊</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Total Classes</div>
+                <div id="attSummaryTotal" style="font-size: 1.5rem; font-weight: 800; color: var(--heading-deep-blue);">--</div>
+              </div>
+            </div>
+            <div class="attendance-summary-card">
+              <div class="att-card-icon" style="color: #10B981;">✅</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Present</div>
+                <div id="attSummaryPresent" style="font-size: 1.5rem; font-weight: 800; color: #10B981;">--</div>
+              </div>
+            </div>
+            <div class="attendance-summary-card">
+              <div class="att-card-icon" style="color: #EF4444;">❌</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Absent</div>
+                <div id="attSummaryAbsent" style="font-size: 1.5rem; font-weight: 800; color: #EF4444;">--</div>
+              </div>
+            </div>
+            <div class="attendance-summary-card">
+              <div class="att-card-icon" style="color: var(--primary-blue);">🎯</div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Attendance Rate</div>
+                <div id="attSummaryRate" style="font-size: 1.5rem; font-weight: 800; color: var(--primary-blue);">--%</div>
+              </div>
             </div>
           </div>
+
+          <!-- Faculty Active Session Card -->
+          <div id="facultyActiveSessionCard" class="content-card" style="display: none; border-color: var(--primary-blue);">
+            <div class="card-title-bar">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="attendance-pulse-dot"></span>
+                <h3 id="facActiveSessionTitle">Active Attendance Session in Progress</h3>
+              </div>
+              <button type="button" class="btn-danger" id="btnCloseAttSessionBtn" onclick="App.closeCurrentAttendanceSession()">
+                ⏹ End & Close Attendance Session
+              </button>
+            </div>
+            <p id="facActiveSessionDesc" style="margin-bottom: 1rem;">Students are currently able to submit attendance for this class.</p>
+          </div>
+
+          <!-- Attendance Records Table -->
+          <div class="content-card">
+            <div class="card-title-bar">
+              <h3 id="attendanceTableHeading">Attendance Records Log</h3>
+              <div id="attendanceTableControls"></div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead id="attendanceTableHead">
+                  <tr>
+                    <th>Date</th>
+                    <th>Subject</th>
+                    <th>Student / Batch</th>
+                    <th>Status</th>
+                    <th>Marked By</th>
+                    <th>Timestamp</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceTableBody">
+                  <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading attendance records...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CURRICULUM (7 Core Subjects)        -->
+        <!-- ========================================== -->
+        <section id="view-curriculum" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>7 Core Curriculum Subjects</h2>
+              <p>Full unit lesson plans, topic hours, sequence orders, and exam scopes.</p>
+            </div>
+          </div>
+          <div id="curriculumSubjectsContainer" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: TIMETABLE & CALENDAR                -->
+        <!-- ========================================== -->
+        <section id="view-calendar" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Academic Timetable & Schedule</h2>
+              <p>Weekly scheduled periods, assigned rooms, working Saturdays, and academic holidays.</p>
+            </div>
+          </div>
+          <div class="content-card">
+            <div class="card-title-bar">
+              <h3>Weekly Class Schedule</h3>
+              <span class="status-pill ontrack">Working Saturdays Mode: 2nd & 4th</span>
+            </div>
+            <div id="timetableGridContainer">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: USER ACCOUNTS (Admin)               -->
+        <!-- ========================================== -->
+        <section id="view-users" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>User Accounts & Portals Management</h2>
+              <p>Provision and manage Admin, Faculty, and Student access across campuses.</p>
+            </div>
+            <button type="button" class="btn-primary" onclick="App.openAddUserModal()">
+              + Provision New User
+            </button>
+          </div>
+          <div class="content-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email Address</th>
+                    <th>Phone</th>
+                    <th>Portal Role</th>
+                    <th>Campus</th>
+                    <th>Batch</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: ALERTS & ESCALATIONS                -->
+        <!-- ========================================== -->
+        <section id="view-alerts" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Alerts, Reminders & Escalations</h2>
+              <p>Automatic tracking of missed session logs, 24-hour reminders, and escalation warnings.</p>
+            </div>
+          </div>
+          <div id="alertsContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 6: CSV IMPORT & EXPORT (Admin)         -->
+        <!-- ========================================== -->
+        <section id="view-imports" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>CSV Data Import & Report Export</h2>
+              <p>Bulk upload syllabus topics, timetable schedules, and export tracking data.</p>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+            <div class="content-card">
+              <h3>📥 Import Syllabus Topics CSV</h3>
+              <p style="margin-bottom: 1rem; font-size: 0.85rem;">Upload topic sequences, unit numbers, planned hours, and exam scopes.</p>
+              <form onsubmit="event.preventDefault(); App.handleCsvUpload('syllabus');">
+                <input type="file" id="csvFileInputSyllabus" accept=".csv" class="form-input" style="margin-bottom: 1rem;" required>
+                <button type="submit" class="btn-primary">Upload Syllabus CSV</button>
+              </form>
+            </div>
+            <div class="content-card">
+              <h3>📥 Import Timetable Slots CSV</h3>
+              <p style="margin-bottom: 1rem; font-size: 0.85rem;">Upload campus schedules, weekdays, start/end times, and rooms.</p>
+              <form onsubmit="event.preventDefault(); App.handleCsvUpload('timetable');">
+                <input type="file" id="csvFileInputTimetable" accept=".csv" class="form-input" style="margin-bottom: 1rem;" required>
+                <button type="submit" class="btn-primary">Upload Timetable CSV</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 7: FAST SESSION LOGGER (<60s Faculty)  -->
+        <!-- ========================================== -->
+        <section id="view-logger" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Fast Session Logger (&lt;60s Workflow)</h2>
+              <p>Rapidly record class delivery, topic progress %, classwork, homework, and stopwatch time.</p>
+            </div>
+          </div>
+          <div id="loggerTodaySlotsContainer">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 8: SESSION HISTORY (Faculty)           -->
+        <!-- ========================================== -->
+        <section id="view-history" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Teaching Session History</h2>
+              <p>Complete historical log of classes taught, topics covered, and hours delivered.</p>
+            </div>
+          </div>
+          <div class="content-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Subject</th>
+                    <th>Batch</th>
+                    <th>Duration</th>
+                    <th>Progress %</th>
+                    <th>Topics Covered</th>
+                    <th>Classwork / Homework</th>
+                  </tr>
+                </thead>
+                <tbody id="sessionHistoryTableBody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 9: STUDENT PORTAL VIEW                 -->
+        <!-- ========================================== -->
+        <section id="view-student" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>My Enrolled Subjects & Progression</h2>
+              <p>Your personalized syllabus completion status, delivered hours, and study materials.</p>
+            </div>
+          </div>
+          <div id="studentSubjectsContainer" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 10: EXAM READINESS (Student)           -->
+        <!-- ========================================== -->
+        <section id="view-exams" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <h2>Exam Readiness & Target Windows</h2>
+              <p>Hour-weighted syllabus coverage calculations for Sessional, Mid-Term, and End-Term exams.</p>
+            </div>
+          </div>
+          <div id="examWindowsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: START ATTENDANCE SESSION (Faculty)  -->
+  <!-- ========================================== -->
+  <div id="startAttendanceModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">⏱️ Initiate Class Attendance Session</div>
+        <button class="btn-close" onclick="App.closeModal('startAttendanceModal')">&times;</button>
+      </div>
+      <form id="startAttendanceForm" onsubmit="event.preventDefault(); App.submitStartAttendance();">
+        <div class="form-group">
+          <label class="form-label" for="attModalSubject">Subject:</label>
+          <select id="attModalSubject" class="form-select" required></select>
         </div>
-
-        <!-- Today's Scheduled Classes List -->
-        <div id="todaySessionsList">
-          <!-- Populated dynamically -->
+        <div class="form-group">
+          <label class="form-label" for="attModalBatch">Target Class Batch:</label>
+          <input type="text" id="attModalBatch" class="form-input" placeholder="e.g. Batch-2026-Mirai-A" required>
         </div>
-      </div>
-    </section>
-
-    <!-- ========================================== -->
-    <!-- TAB 3: EXAM READINESS HUB                  -->
-    <!-- ========================================== -->
-    <section id="view-exams" class="tab-view-content" style="display: none;">
-      <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-indigo);">
-        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Examination Readiness Assessment</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-          Tracks syllabus completion strictly within examination scope. Topics outside the exam scope do not affect readiness ratings.
-        </p>
-      </div>
-
-      <div id="examCardsContainer" class="exam-cards-grid">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
-
-    <!-- ========================================== -->
-    <!-- TAB 4: STUDENT VIEW (Read-Only)            -->
-    <!-- ========================================== -->
-    <section id="view-student" class="tab-view-content" style="display: none;">
-      <div id="studentPortalContent">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
-
-    <!-- ========================================== -->
-    <!-- TAB 5: TIMETABLE & ACADEMIC CALENDAR       -->
-    <!-- ========================================== -->
-    <section id="view-calendar" class="tab-view-content" style="display: none;">
-      <div id="timetableContainer">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
-
-    <!-- ========================================== -->
-    <!-- TAB 6: MISSED-SESSION ALERTS               -->
-    <!-- ========================================== -->
-    <section id="view-alerts" class="tab-view-content" style="display: none;">
-      <div class="glass-card" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div>
-          <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Missed-Session Alert & Escalation Center</h2>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-            Faculty receives reminder at end of scheduled day. If unlogged after 48 hours, alert escalates automatically to the Campus Manager.
-          </p>
+        <div class="form-group">
+          <label class="form-label" for="attModalCampus">Campus:</label>
+          <select id="attModalCampus" class="form-select" required>
+            <option value="camp_hitech">HI-Tech Campus</option>
+            <option value="camp_juj">Jagannath Campus</option>
+            <option value="camp_ratnam">Rathinam Campus</option>
+          </select>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="font-size: 0.8rem; color: var(--text-dim);">Simulated Time:</span>
-          <span id="simDateControllerDisplay" style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--accent-cyan); font-size: 0.85rem;">2026-10-19</span>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('startAttendanceModal')">Cancel</button>
+          <button type="submit" class="btn-primary" style="flex: 2;">Start Session Now</button>
         </div>
-      </div>
+      </form>
+    </div>
+  </div>
 
-      <div id="alertsListContainer">
-        <!-- Rendered dynamically -->
+  <!-- ========================================== -->
+  <!-- MODAL: AUDIT ATTENDANCE RECORD             -->
+  <!-- ========================================== -->
+  <div id="editAttendanceModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Audit Attendance Record</div>
+        <button class="btn-close" onclick="App.closeModal('editAttendanceModal')">&times;</button>
       </div>
-    </section>
+      <form id="editAttendanceForm" onsubmit="event.preventDefault(); App.submitEditAttendance();">
+        <input type="hidden" id="editAttRecordId">
+        <div class="form-group">
+          <label class="form-label">Student Name:</label>
+          <input type="text" id="editAttStudentName" class="form-input" readonly disabled>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editAttStatus">Attendance Status:</label>
+          <select id="editAttStatus" class="form-select" required>
+            <option value="PRESENT">PRESENT</option>
+            <option value="ABSENT">ABSENT</option>
+            <option value="EXCUSED">EXCUSED (Medical / Approved)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editAttNotes">Audit Note / Reason:</label>
+          <textarea id="editAttNotes" class="form-textarea" rows="3" placeholder="Reason for status correction (will be logged for audit)..."></textarea>
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('editAttendanceModal')">Cancel</button>
+          <button type="submit" class="btn-primary" style="flex: 2;">Save Correction</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    <!-- ========================================== -->
-    <!-- TAB 7: CSV IMPORT / EXPORT                 -->
-    <!-- ========================================== -->
-    <section id="view-imports" class="tab-view-content" style="display: none;">
-      <div class="glass-card" style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">CSV Import & Export Engine</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-          Atomic database transactions with strict row validation. Invalid records are rejected and will not corrupt the database.
-        </p>
+  <!-- ========================================== -->
+  <!-- MODAL: PROVISION USER ACCOUNT (Admin)      -->
+  <!-- ========================================== -->
+  <div id="addUserModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">👥 Provision New User Account</div>
+        <button class="btn-close" onclick="App.closeModal('addUserModal')">&times;</button>
       </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
-        <!-- 1. Calendar Import -->
-        <div class="glass-card">
-          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">📅 Academic Calendar & Holidays</h3>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-            Import campus holidays, sessional dates, and academic events. Automatically recalculates syllabus dates.
-          </p>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <a href="/api/exports/export/template/calendar" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
-              ⬇️ Sample Template
-            </a>
+      <form id="addUserForm" onsubmit="event.preventDefault(); App.submitCreateUser();">
+        <div id="addUserError" class="login-error-banner" style="display: none;">
+          <span>⚠️</span>
+          <span id="addUserErrorMsg"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newUserName">Full Name:</label>
+          <input type="text" id="newUserName" class="form-input" placeholder="e.g. Dr. Priya Sen" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="newUserEmail">Email Address:</label>
+            <input type="email" id="newUserEmail" class="form-input" placeholder="priya@edvanta.msot.edu" required>
           </div>
           <div class="form-group">
-            <input type="file" id="csvCalendarFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('calendar', this)">
+            <label class="form-label" for="newUserPhone">Phone Number:</label>
+            <input type="tel" id="newUserPhone" class="form-input" placeholder="9876543299">
           </div>
         </div>
-
-        <!-- 2. Timetable Import -->
-        <div class="glass-card">
-          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">⏰ Timetable Slots</h3>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-            Import weekly batch schedules. Automatically computes exact decimal teaching hours (e.g. 50 mins = 0.83 hrs).
-          </p>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <a href="/api/exports/export/template/timetable" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
-              ⬇️ Sample Template
-            </a>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label" for="newUserRole">Portal Role:</label>
+            <select id="newUserRole" class="form-select" required onchange="App.handleNewUserRoleChange()">
+              <option value="FACULTY">Faculty</option>
+              <option value="STUDENT">Student</option>
+              <option value="CAMPUS_MANAGER">Campus Manager (Admin Portal)</option>
+            </select>
           </div>
           <div class="form-group">
-            <input type="file" id="csvTimetableFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('timetable', this)">
+            <label class="form-label" for="newUserCampus">Campus:</label>
+            <select id="newUserCampus" class="form-select" required>
+              <option value="camp_hitech">HI-Tech Campus</option>
+              <option value="camp_juj">Jagannath Campus</option>
+              <option value="camp_ratnam">Rathinam Campus</option>
+            </select>
           </div>
         </div>
+        <div class="form-group" id="newUserBatchGroup">
+          <label class="form-label" for="newUserBatch">Assigned Batch Name:</label>
+          <input type="text" id="newUserBatch" class="form-input" placeholder="e.g. Batch-2026-Mirai-A">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newUserPassword">Initial Password:</label>
+          <input type="password" id="newUserPassword" class="form-input" value="edvanta123" required minlength="6">
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('addUserModal')">Cancel</button>
+          <button type="submit" class="btn-primary" style="flex: 2;">Provision Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        <!-- 3. Syllabus Import -->
-        <div class="glass-card">
-          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">📚 Syllabus & Lesson Plans</h3>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-            Import units, topics, planned teaching hours, and examination scopes.
-          </p>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <a href="/api/exports/export/template/syllabus" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
-              ⬇️ Sample Template
-            </a>
-          </div>
-          <div class="form-group">
-            <input type="file" id="csvSyllabusFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('syllabus', this)">
-          </div>
-        </div>
+  <!-- ========================================== -->
+  <!-- MODAL: CHANGE PASSWORD                     -->
+  <!-- ========================================== -->
+  <div id="changePasswordModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">🔑 Change Account Password</div>
+        <button class="btn-close" onclick="App.closeModal('changePasswordModal')">&times;</button>
       </div>
-    </section>
-
-  </main>
+      <form id="changePasswordForm" onsubmit="event.preventDefault(); App.submitChangePassword();">
+        <div id="changePasswordError" class="login-error-banner" style="display: none;">
+          <span>⚠️</span>
+          <span id="changePasswordErrorMsg"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="currentPassword">Current Password:</label>
+          <input type="password" id="currentPassword" class="form-input" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newPassword">New Password (min 6 characters):</label>
+          <input type="password" id="newPassword" class="form-input" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirmPassword">Confirm New Password:</label>
+          <input type="password" id="confirmPassword" class="form-input" required minlength="6" autocomplete="new-password">
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('changePasswordModal')">Cancel</button>
+          <button type="submit" class="btn-primary" style="flex: 2;">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ========================================== -->
   <!-- MODAL: FAST SESSION LOGGER (<60s)          -->
   <!-- ========================================== -->
   <div id="sessionLoggerModal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <div>
           <div class="modal-title">⚡ Log Teaching Session</div>
-          <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">Mobile Fast Flow</div>
+          <div style="font-size: 0.75rem; color: var(--primary-blue); font-weight: 700;">Fast Mobile-First Flow</div>
         </div>
         <button class="btn-close" onclick="App.closeModal('sessionLoggerModal')">&times;</button>
       </div>
 
       <!-- Usability Stopwatch Banner -->
-      <div class="stopwatch-widget">
+      <div style="background-color: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         <div>
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">⏱️ Flow Stopwatch:</span>
-          <span style="font-size: 0.75rem; color: var(--text-dim); margin-left: 0.25rem;">Target < 60s</span>
+          <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase;">⏱️ Flow Stopwatch:</span>
+          <span style="font-size: 0.75rem; color: var(--heading-deep-blue); margin-left: 0.25rem;">Target &lt; 60s</span>
         </div>
-        <div id="loggerStopwatchTimer" class="stopwatch-time">00:00</div>
+        <div id="loggerStopwatchTimer" style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 800; color: var(--primary-blue);">00:00</div>
       </div>
 
-      <div id="logModalHeaderInfo" style="margin-bottom: 1rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-glass);">
+      <div id="logModalHeaderInfo" style="margin-bottom: 1rem; background-color: var(--surface-soft); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--borders);">
         <!-- Populated dynamically -->
       </div>
 
@@ -436,20 +1041,20 @@
       <!-- Status Selection Chips -->
       <div class="form-group">
         <label class="form-label">Session Status (Tap to select):</label>
-        <div class="status-chips-group">
-          <button type="button" class="status-chip selected" data-status="COMPLETED" onclick="App.selectStatusChip('COMPLETED')">
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <button type="button" class="status-pill complete status-chip selected" data-status="COMPLETED" onclick="App.selectStatusChip('COMPLETED')">
             ✅ COMPLETED
           </button>
-          <button type="button" class="status-chip" data-status="IN_PROGRESS" onclick="App.selectStatusChip('IN_PROGRESS')">
+          <button type="button" class="status-pill ontrack status-chip" data-status="IN_PROGRESS" onclick="App.selectStatusChip('IN_PROGRESS')">
             ⏳ IN PROGRESS
           </button>
-          <button type="button" class="status-chip" data-status="SKIPPED" onclick="App.selectStatusChip('SKIPPED')">
+          <button type="button" class="status-pill tight status-chip" data-status="SKIPPED" onclick="App.selectStatusChip('SKIPPED')">
             ⏭️ SKIPPED
           </button>
-          <button type="button" class="status-chip" data-status="MERGED" onclick="App.selectStatusChip('MERGED')">
+          <button type="button" class="status-pill status-chip" data-status="MERGED" onclick="App.selectStatusChip('MERGED')">
             🔗 MERGED
           </button>
-          <button type="button" class="status-chip" data-status="CANCELLED" onclick="App.selectStatusChip('CANCELLED')">
+          <button type="button" class="status-pill danger status-chip" data-status="CANCELLED" onclick="App.selectStatusChip('CANCELLED')">
             ❌ CANCELLED
           </button>
         </div>
@@ -458,11 +1063,11 @@
       <!-- % Complete Section (for IN_PROGRESS) -->
       <div id="logModalPctSection" class="form-group" style="display: none;">
         <label class="form-label">Topic Coverage Percentage:</label>
-        <div class="pct-pills-group">
-          <button type="button" class="pct-pill" data-pct="25" onclick="App.selectPctPill(25)">25%</button>
-          <button type="button" class="pct-pill" data-pct="50" onclick="App.selectPctPill(50)">50%</button>
-          <button type="button" class="pct-pill" data-pct="75" onclick="App.selectPctPill(75)">75%</button>
-          <button type="button" class="pct-pill active" data-pct="100" onclick="App.selectPctPill(100)">100%</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-secondary pct-pill" data-pct="25" onclick="App.selectPctPill(25)">25%</button>
+          <button type="button" class="btn-secondary pct-pill" data-pct="50" onclick="App.selectPctPill(50)">50%</button>
+          <button type="button" class="btn-secondary pct-pill" data-pct="75" onclick="App.selectPctPill(75)">75%</button>
+          <button type="button" class="btn-secondary pct-pill active" data-pct="100" onclick="App.selectPctPill(100)">100%</button>
         </div>
       </div>
 
@@ -511,7 +1116,7 @@
   <!-- MODAL: TRACEABILITY INSPECTOR              -->
   <!-- ========================================== -->
   <div id="traceabilityModal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <div class="modal-title">🔍 Metric Calculation Traceability</div>
         <button class="btn-close" onclick="App.closeModal('traceabilityModal')">&times;</button>
@@ -526,9 +1131,9 @@
   <!-- MODAL: STUDENT TOPICS BREAKDOWN            -->
   <!-- ========================================== -->
   <div id="studentTopicsModal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 650px;">
       <div class="modal-header">
-        <div class="modal-title">📖 Curriculum Syllabus</div>
+        <div class="modal-title">📖 Curriculum Syllabus & Lesson Plan</div>
         <button class="btn-close" onclick="App.closeModal('studentTopicsModal')">&times;</button>
       </div>
       <div id="studentTopicsModalBody">
@@ -546,7 +1151,7 @@
         <div class="modal-title">📅 Add Campus Holiday / Event</div>
         <button class="btn-close" onclick="App.closeModal('addHolidayModal')">&times;</button>
       </div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+      <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
         Note: Adding a holiday will immediately recalculate future planned topic dates across affected subjects.
       </p>
       <div class="form-group">
@@ -579,7 +1184,7 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- App Scripts -->
+  <!-- Application Logic Scripts -->
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
 </body>

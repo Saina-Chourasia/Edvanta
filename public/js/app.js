@@ -1,5 +1,5 @@
 // EDVANTA Client Application Controller
-// Orchestrates state management, UI rendering, Chart.js visualizations, and role switching
+// Modernized Role-Based Portals (Admin, Faculty, Student) with Landing Page, Left Sidebar, and Real Attendance Management
 
 document.addEventListener('DOMContentLoaded', async () => {
   const App = {
@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tracks: [],
     semesters: [],
     activeTab: 'dashboard',
+    selectedLoginPortal: 'FACULTY',
     activeFilters: {
       campus_id: '',
       track_id: '',
@@ -16,58 +17,281 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
     dashboardData: null,
     todaySessionsData: null,
+    currentActiveAttendanceSessionId: null,
     stopwatchInterval: null,
     stopwatchSeconds: 0,
+    sidebarCollapsed: false,
     charts: {
       hours: null,
       status: null
     },
 
+    // -------------------------------------------------------------
+    // INITIALIZATION & PUBLIC LANDING PAGE (Section 2)
+    // -------------------------------------------------------------
     async init() {
-      console.log('🚀 Initializing EDVANTA Client App...');
+      console.log('🚀 Initializing EDVANTA MSOT Educational Platform...');
       this.bindEvents();
 
-      // Check current session or default to quick login as Admin
       const token = API.getToken();
       if (token) {
         try {
           this.user = await API.getMe();
+          await this.onLoginSuccess();
         } catch (e) {
-          console.warn('Existing token invalid, logging in as demo admin...');
-          await this.quickLogin('ADMIN');
+          console.warn('Session token expired or invalid:', e.message);
+          API.logout();
+          this.showLandingPage();
         }
       } else {
-        await this.quickLogin('ADMIN');
+        // Requirement 2: Show Landing Page first when opening website
+        this.showLandingPage();
+      }
+    },
+
+    // Show Public Landing Page
+    showLandingPage(event) {
+      if (event) event.preventDefault();
+
+      const landing = document.getElementById('landingView');
+      const login = document.getElementById('loginView');
+      const shell = document.getElementById('appShell');
+      const publicNav = document.getElementById('publicTopNav');
+
+      if (landing) landing.style.display = 'flex';
+      if (login) login.style.display = 'none';
+      if (shell) shell.style.display = 'none';
+      if (publicNav) publicNav.style.display = 'block';
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    // Show 3-Portal Login Page (Section 4)
+    showLoginView(noticeMessage, targetPortal = 'FACULTY') {
+      const landing = document.getElementById('landingView');
+      const login = document.getElementById('loginView');
+      const shell = document.getElementById('appShell');
+      const publicNav = document.getElementById('publicTopNav');
+
+      if (landing) landing.style.display = 'none';
+      if (login) login.style.display = 'flex';
+      if (shell) shell.style.display = 'none';
+      if (publicNav) publicNav.style.display = 'block';
+
+      this.selectLoginPortal(targetPortal);
+
+      const noticeBanner = document.getElementById('loginNoticeBanner');
+      const noticeMsg = document.getElementById('loginNoticeMessage');
+      if (noticeBanner) {
+        if (noticeMessage) {
+          if (noticeMsg) noticeMsg.textContent = noticeMessage;
+          noticeBanner.style.display = 'flex';
+        } else {
+          noticeBanner.style.display = 'none';
+        }
       }
 
+      const errBanner = document.getElementById('loginErrorBanner');
+      if (errBanner) errBanner.style.display = 'none';
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    // Select Active Portal on Login View (Section 4)
+    selectLoginPortal(role) {
+      this.selectedLoginPortal = role;
+
+      const adminCard = document.getElementById('portalCardAdmin');
+      const facCard = document.getElementById('portalCardFaculty');
+      const stuCard = document.getElementById('portalCardStudent');
+
+      if (adminCard) adminCard.classList.toggle('selected', role === 'ADMIN');
+      if (facCard) facCard.classList.toggle('selected', role === 'FACULTY');
+      if (stuCard) stuCard.classList.toggle('selected', role === 'STUDENT');
+
+      const heading = document.getElementById('loginPortalHeading');
+      const subtitle = document.getElementById('loginPortalSubtitle');
+      const submitBtn = document.getElementById('btnLoginSubmit');
+
+      if (role === 'ADMIN') {
+        if (heading) heading.textContent = 'Sign In to Admin Portal';
+        if (subtitle) subtitle.textContent = 'Dean & Campus Administrator Authentication';
+        if (submitBtn) submitBtn.textContent = 'Sign In to Admin Portal →';
+      } else if (role === 'FACULTY') {
+        if (heading) heading.textContent = 'Sign In to Faculty Portal';
+        if (subtitle) subtitle.textContent = 'Professor & Instructor Course Progression';
+        if (submitBtn) submitBtn.textContent = 'Sign In to Faculty Portal →';
+      } else if (role === 'STUDENT') {
+        if (heading) heading.textContent = 'Sign In to Student Portal';
+        if (subtitle) subtitle.textContent = 'Enrolled Student Class Timetable & Attendance';
+        if (submitBtn) submitBtn.textContent = 'Sign In to Student Portal →';
+      }
+
+      const input = document.getElementById('loginIdentifier');
+      if (input) input.focus();
+    },
+
+    // 1-Click Feature Card Navigation on Landing Page (Section 3)
+    handleFeatureCardClick(feature) {
+      if (this.user) {
+        this.switchTab(feature);
+      } else {
+        const featureNames = {
+          curriculum: 'Academic Progression',
+          calendar: 'Timetable',
+          attendance: 'Attendance Management',
+          dashboard: 'Reports & Insights'
+        };
+        const name = featureNames[feature] || 'academic features';
+        const roleTarget = feature === 'dashboard' ? 'ADMIN' : (feature === 'attendance' ? 'FACULTY' : 'STUDENT');
+        this.showLoginView(`Please sign in to access ${name}.`, roleTarget);
+      }
+    },
+
+    // Evaluator Quick-Fill Accounts Reference (Section 4 - Exactly 3 Entries)
+    fillDemoLogin(identifier, password, portalRole = 'FACULTY') {
+      this.selectLoginPortal(portalRole);
+      const idInput = document.getElementById('loginIdentifier');
+      const passInput = document.getElementById('loginPassword');
+      if (idInput) idInput.value = identifier;
+      if (passInput) passInput.value = password;
+      this.handleLogin();
+    },
+
+    // -------------------------------------------------------------
+    // AUTHENTICATED APP SHELL & LEFT SIDEBAR (Section 6)
+    // -------------------------------------------------------------
+    async onLoginSuccess() {
+      if (!this.user) return;
+
+      // Hide public pages, show App Shell
+      const landing = document.getElementById('landingView');
+      const login = document.getElementById('loginView');
+      const shell = document.getElementById('appShell');
+      const publicNav = document.getElementById('publicTopNav');
+
+      if (landing) landing.style.display = 'none';
+      if (login) login.style.display = 'none';
+      if (publicNav) publicNav.style.display = 'none';
+      if (shell) shell.style.display = 'flex';
+
+      // Update Header & Sidebar UI
+      this.updateHeaderUI();
+
+      // Render role-specific navigation tabs in sidebar
+      this.renderNavTabsForRole();
+
+      // Load metadata (Campuses, Tracks, Semesters)
       await this.loadInitialMetadata();
-      await this.updateUserRoleUI();
-      await this.refreshActiveTab();
+
+      // Select default tab for user's role
+      let defaultTab = 'dashboard';
+      if (this.user.role === 'FACULTY') {
+        defaultTab = 'logger';
+      } else if (this.user.role === 'STUDENT') {
+        defaultTab = 'student';
+      }
+
+      this.switchTab(defaultTab);
       this.startAlertsPolling();
     },
 
-    bindEvents() {
-      // Role Switcher
-      const roleSelect = document.getElementById('roleSwitcherSelect');
-      if (roleSelect) {
-        roleSelect.addEventListener('change', async (e) => {
-          const val = e.target.value;
-          if (val.startsWith('usr_')) {
-            await this.quickLogin(null, val);
-          } else {
-            await this.quickLogin(val);
-          }
-        });
+    updateHeaderUI() {
+      if (!this.user) return;
+
+      const portalBadge = document.getElementById('portalRoleBadge');
+      const topbarPill = document.getElementById('currentPortalNamePill');
+
+      let portalLabel = '👑 ADMIN PORTAL';
+      if (this.user.role === 'FACULTY') portalLabel = '👨‍🏫 FACULTY PORTAL';
+      if (this.user.role === 'STUDENT') portalLabel = '🎓 STUDENT PORTAL';
+
+      if (portalBadge) {
+        portalBadge.className = `portal-badge ${this.user.role}`;
+        portalBadge.textContent = portalLabel;
+      }
+      if (topbarPill) {
+        topbarPill.textContent = portalLabel;
       }
 
-      // Nav Tabs
-      document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          const target = tab.dataset.tab;
-          this.switchTab(target);
-        });
-      });
+      const nameDisplay = document.getElementById('userDisplayName');
+      if (nameDisplay) nameDisplay.textContent = this.user.name;
 
+      const campusDisplay = document.getElementById('userCampusDisplay');
+      if (campusDisplay) {
+        campusDisplay.textContent = this.user.campus_name || (this.user.role === 'ADMIN' ? 'All Campuses' : 'Campus');
+      }
+
+      const avatarCircle = document.getElementById('userAvatarCircle');
+      if (avatarCircle) {
+        avatarCircle.textContent = (this.user.name || 'U').charAt(0).toUpperCase();
+      }
+
+      // Hide simulation date pill for students
+      const simPill = document.getElementById('simDatePillWrapper');
+      if (simPill) {
+        simPill.style.display = this.user.role === 'STUDENT' ? 'none' : 'flex';
+      }
+    },
+
+    // Render Left Sidebar Navigation Links (Section 5 & 6)
+    renderNavTabsForRole() {
+      const container = document.getElementById('sidebarNavContainer');
+      if (!container || !this.user) return;
+
+      let tabs = [];
+      if (this.user.role === 'ADMIN' || this.user.role === 'CAMPUS_MANAGER') {
+        tabs = [
+          { id: 'dashboard', icon: '📊', label: 'Dashboard & Pacing' },
+          { id: 'attendance', icon: '⏱️', label: 'Attendance Management' },
+          { id: 'curriculum', icon: '📚', label: '7 Subjects Curriculum' },
+          { id: 'calendar', icon: '📅', label: 'Master Timetable' },
+          { id: 'users', icon: '👥', label: 'User Accounts' },
+          { id: 'alerts', icon: '🚨', label: 'Alerts & Escalations' },
+          { id: 'imports', icon: '📁', label: 'CSV Import & Export' }
+        ];
+      } else if (this.user.role === 'FACULTY') {
+        tabs = [
+          { id: 'logger', icon: '⚡', label: 'Fast Session Logger' },
+          { id: 'attendance', icon: '⏱️', label: 'Class Attendance' },
+          { id: 'calendar', icon: '📅', label: 'My Teaching Schedule' },
+          { id: 'curriculum', icon: '📚', label: 'My Subjects & Topics' },
+          { id: 'history', icon: '🕒', label: 'Session History' },
+          { id: 'alerts', icon: '🔔', label: 'Teaching Reminders' }
+        ];
+      } else if (this.user.role === 'STUDENT') {
+        tabs = [
+          { id: 'student', icon: '🎓', label: 'My Enrolled Subjects' },
+          { id: 'attendance', icon: '⏱️', label: 'My Attendance' },
+          { id: 'calendar', icon: '📅', label: 'My Class Timetable' },
+          { id: 'exams', icon: '🎯', label: 'Exam Readiness & Dates' }
+        ];
+      }
+
+      container.innerHTML = tabs.map(t => `
+        <button type="button" class="sidebar-nav-item ${t.id === this.activeTab ? 'active' : ''}" data-tab="${t.id}" onclick="App.switchTab('${t.id}')">
+          <span class="nav-icon">${t.icon}</span>
+          <span>${t.label}</span>
+        </button>
+      `).join('');
+    },
+
+    toggleSidebarDesktop() {
+      const sidebar = document.getElementById('appSidebar');
+      if (sidebar) {
+        this.sidebarCollapsed = !this.sidebarCollapsed;
+        sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
+      }
+    },
+
+    toggleSidebarMobile(open) {
+      const sidebar = document.getElementById('appSidebar');
+      const backdrop = document.getElementById('mobileNavBackdrop');
+      if (sidebar) sidebar.classList.toggle('mobile-open', open);
+      if (backdrop) backdrop.classList.toggle('show', open);
+    },
+
+    bindEvents() {
       // Filter Inputs
       ['campusFilter', 'trackFilter', 'semesterFilter'].forEach(id => {
         const el = document.getElementById(id);
@@ -86,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (resetSimBtn) {
         resetSimBtn.addEventListener('click', async () => {
           await API.resetSimulation();
-          this.showToast('Simulation date reset to system local time', 'success');
+          this.showToast('Simulation date reset to system clock', 'success');
           await this.refreshActiveTab();
         });
       }
@@ -103,107 +327,163 @@ document.addEventListener('DOMContentLoaded', async () => {
           const day = String(d.getDate()).padStart(2, '0');
           const nextDate = `${y}-${m}-${day}`;
 
-          const res = await API.simulateDate(nextDate);
+          await API.simulateDate(nextDate);
           this.showToast(`Simulation advanced to ${nextDate}. Checked missed logs!`, 'info');
           await this.refreshActiveTab();
         });
       }
     },
 
-    async quickLogin(role, userId = null) {
-      try {
-        const data = await API.quickLogin(role, userId);
-        this.user = data.user;
-        this.showToast(`Logged in as: ${this.user.name} (${this.user.role})`, 'success');
-        await this.updateUserRoleUI();
-        await this.refreshActiveTab();
-      } catch (err) {
-        this.showToast(`Login failed: ${err.message}`, 'error');
-      }
-    },
-
-    async updateUserRoleUI() {
-      if (!this.user) return;
-      
-      const roleSelect = document.getElementById('roleSwitcherSelect');
-      if (roleSelect) {
-        // Find option that matches
-        for (const opt of roleSelect.options) {
-          if (opt.value === this.user.id || opt.value === this.user.role) {
-            opt.selected = true;
-            break;
-          }
-        }
-      }
-
-      const roleBadge = document.getElementById('currentUserBadge');
-      if (roleBadge) {
-        roleBadge.textContent = `${this.user.name} • ${this.user.role.replace('_', ' ')}`;
-      }
-
-      // If Student, automatically force Student view or disable administrative tabs
-      const studentTab = document.querySelector('[data-tab="student"]');
-      const loggerTab = document.querySelector('[data-tab="logger"]');
-      const calendarTab = document.querySelector('[data-tab="calendar"]');
-      const importsTab = document.querySelector('[data-tab="imports"]');
-
-      if (this.user.role === 'STUDENT') {
-        if (studentTab) studentTab.style.display = 'inline-flex';
-        if (loggerTab) loggerTab.style.display = 'none';
-        if (calendarTab) calendarTab.style.display = 'none';
-        if (importsTab) importsTab.style.display = 'none';
-        if (this.activeTab === 'logger' || this.activeTab === 'imports') {
-          this.switchTab('student');
-        }
+    handleBrandClick(event) {
+      if (event) event.preventDefault();
+      if (!this.user) {
+        this.showLandingPage();
+      } else if (this.user.role === 'STUDENT') {
+        this.switchTab('student');
+      } else if (this.user.role === 'FACULTY') {
+        this.switchTab('logger');
       } else {
-        if (studentTab) studentTab.style.display = 'inline-flex';
-        if (loggerTab) loggerTab.style.display = 'inline-flex';
-        if (calendarTab) calendarTab.style.display = 'inline-flex';
-        if (importsTab) importsTab.style.display = 'inline-flex';
+        this.switchTab('dashboard');
       }
     },
 
-    async loadInitialMetadata() {
+    // -------------------------------------------------------------
+    // AUTH ACTIONS (Section 4 & 13)
+    // -------------------------------------------------------------
+    async handleLogin() {
+      const idInput = document.getElementById('loginIdentifier');
+      const passInput = document.getElementById('loginPassword');
+      const errBanner = document.getElementById('loginErrorBanner');
+      const errMsg = document.getElementById('loginErrorMessage');
+
+      const identifier = idInput ? idInput.value.trim() : '';
+      const password = passInput ? passInput.value : '';
+
+      if (!identifier || !password) {
+        if (errBanner) {
+          errBanner.style.display = 'flex';
+          if (errMsg) errMsg.textContent = 'Please enter both your registered email or phone and password.';
+        }
+        return;
+      }
+
+      const submitBtn = document.getElementById('btnLoginSubmit');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Authenticating...';
+      }
+
       try {
-        const [cData, tData, sData] = await Promise.all([
-          API.getCampuses(),
-          API.getTracks(),
-          API.getSemesters()
-        ]);
-
-        this.campuses = cData.campuses || [];
-        this.tracks = tData.tracks || [];
-        this.semesters = sData.semesters || [];
-
-        this.populateFilterDropdowns();
+        const data = await API.login(identifier, password);
+        this.user = data.user;
+        if (errBanner) errBanner.style.display = 'none';
+        this.showToast(`Welcome back, ${this.user.name}!`, 'success');
+        await this.onLoginSuccess();
       } catch (err) {
-        console.error('Metadata load error:', err);
+        if (errBanner) {
+          errBanner.style.display = 'flex';
+          if (errMsg) errMsg.textContent = err.message || 'Invalid email/phone or password.';
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Sign In to Portal →';
+        }
       }
     },
 
-    populateFilterDropdowns() {
-      const campSelect = document.getElementById('campusFilter');
-      if (campSelect) {
-        campSelect.innerHTML = '<option value="">All Campuses (4)</option>' +
-          this.campuses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      }
+    handleLogout() {
+      API.logout();
+      this.user = null;
+      this.showToast('You have been signed out successfully.', 'info');
+      this.showLandingPage();
+    },
 
-      const trackSelect = document.getElementById('trackFilter');
-      if (trackSelect) {
-        trackSelect.innerHTML = '<option value="">All Academic Tracks</option>' +
-          this.tracks.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-      }
-
-      const semSelect = document.getElementById('semesterFilter');
-      if (semSelect) {
-        semSelect.innerHTML = '<option value="">All Semesters</option>' +
-          this.semesters.map(s => `<option value="${s.id}">${s.name} (${s.batch_name})</option>`).join('');
+    togglePasswordVisibility(inputId) {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
       }
     },
 
+    openChangePasswordModal() {
+      const modal = document.getElementById('changePasswordModal');
+      const err = document.getElementById('changePasswordError');
+      if (err) err.style.display = 'none';
+      if (modal) modal.style.display = 'flex';
+    },
+
+    async submitChangePassword() {
+      const curPass = document.getElementById('currentPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confPass = document.getElementById('confirmPassword').value;
+      const errBanner = document.getElementById('changePasswordError');
+      const errMsg = document.getElementById('changePasswordErrorMsg');
+
+      if (newPass !== confPass) {
+        if (errBanner) {
+          errBanner.style.display = 'flex';
+          errMsg.textContent = 'New passwords do not match.';
+        }
+        return;
+      }
+
+      if (newPass.length < 6) {
+        if (errBanner) {
+          errBanner.style.display = 'flex';
+          errMsg.textContent = 'Password must be at least 6 characters.';
+        }
+        return;
+      }
+
+      try {
+        await API.changePassword(curPass, newPass);
+        this.closeModal('changePasswordModal');
+        this.showToast('Password changed successfully!', 'success');
+      } catch (err) {
+        if (errBanner) {
+          errBanner.style.display = 'flex';
+          errMsg.textContent = err.message;
+        }
+      }
+    },
+
+    // -------------------------------------------------------------
+    // NAVIGATION & TAB SWITCHING (Section 6)
+    // -------------------------------------------------------------
     switchTab(tabId) {
+      if (!this.user) {
+        this.showLoginView('Please sign in to access your portal dashboard.');
+        return;
+      }
+
+      // Close mobile drawer if open
+      this.toggleSidebarMobile(false);
+
+      // Section 13: Role-based navigation guards
+      const adminTabs = ['dashboard', 'attendance', 'curriculum', 'calendar', 'users', 'alerts', 'imports'];
+      const facultyTabs = ['logger', 'attendance', 'calendar', 'curriculum', 'history', 'alerts'];
+      const studentTabs = ['student', 'attendance', 'calendar', 'exams'];
+
+      const role = this.user.role;
+      let isAllowed = false;
+      if (role === 'ADMIN' || role === 'CAMPUS_MANAGER') {
+        isAllowed = adminTabs.includes(tabId);
+      } else if (role === 'FACULTY') {
+        isAllowed = facultyTabs.includes(tabId);
+      } else if (role === 'STUDENT') {
+        isAllowed = studentTabs.includes(tabId);
+      }
+
+      if (!isAllowed) {
+        this.showToast('Access restricted: You do not have permission to view this section.', 'warning');
+        const fallbackTab = role === 'STUDENT' ? 'student' : (role === 'FACULTY' ? 'logger' : 'dashboard');
+        tabId = fallbackTab;
+      }
+
       this.activeTab = tabId;
-      document.querySelectorAll('.nav-tab').forEach(t => {
+
+      document.querySelectorAll('.sidebar-nav-item').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tabId);
       });
 
@@ -215,8 +495,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     async refreshActiveTab() {
+      if (!this.user) return;
+
       if (this.activeTab === 'dashboard') {
         await this.loadDashboard();
+      } else if (this.activeTab === 'attendance') {
+        await this.loadAttendanceView();
+      } else if (this.activeTab === 'curriculum') {
+        await this.loadCurriculumView();
+      } else if (this.activeTab === 'users') {
+        await this.loadUsersView();
       } else if (this.activeTab === 'logger') {
         await this.loadTodayLogger();
       } else if (this.activeTab === 'exams') {
@@ -225,13 +513,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         await this.loadStudentView();
       } else if (this.activeTab === 'calendar') {
         await this.loadCalendarAndTimetable();
+      } else if (this.activeTab === 'history') {
+        await this.loadSessionHistory();
       } else if (this.activeTab === 'alerts') {
         await this.loadAlertsView();
       } else if (this.activeTab === 'imports') {
         await this.loadImportsView();
       }
 
-      // Refresh alert badge
       this.checkAlertsBadge();
     },
 
@@ -255,11 +544,303 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     startAlertsPolling() {
-      setInterval(() => this.checkAlertsBadge(), 20000);
+      this.checkAlertsBadge();
+      setInterval(() => {
+        if (this.user) this.checkAlertsBadge();
+      }, 45000);
     },
 
     // -------------------------------------------------------------
-    // TAB 1: EXECUTIVE DASHBOARD
+    // METADATA & CAMPUS FILTERS (Section 12 - 3 Campuses)
+    // -------------------------------------------------------------
+    async loadInitialMetadata() {
+      try {
+        const [cData, tData, sData] = await Promise.all([
+          API.getCampuses(),
+          API.getTracks(),
+          API.getSemesters()
+        ]);
+
+        this.campuses = cData.campuses || [];
+        this.tracks = tData.tracks || [];
+        this.semesters = sData.semesters || [];
+
+        this.populateFilterDropdowns();
+      } catch (err) {
+        console.error('Metadata load error:', err);
+      }
+    },
+
+    populateFilterDropdowns() {
+      // Requirement 12: Strictly 3 campuses (HI-Tech, Jagannath, Rathinam)
+      const activeCampusIds = ['camp_hitech', 'camp_juj', 'camp_ratnam'];
+      const filteredCampuses = this.campuses.filter(c => activeCampusIds.includes(c.id));
+      const displayCampuses = filteredCampuses.length > 0 ? filteredCampuses : this.campuses;
+
+      const campSelect = document.getElementById('campusFilter');
+      if (campSelect) {
+        if (this.user && this.user.role === 'CAMPUS_MANAGER' && this.user.campus_id) {
+          const userCamp = displayCampuses.find(c => c.id === this.user.campus_id) || { id: this.user.campus_id, name: this.user.campus_name || 'Assigned Campus' };
+          campSelect.innerHTML = `<option value="${userCamp.id}" selected>${userCamp.name}</option>`;
+          campSelect.disabled = true;
+          this.activeFilters.campus_id = userCamp.id;
+        } else {
+          campSelect.disabled = false;
+          campSelect.innerHTML = `<option value="">All Campuses (${displayCampuses.length})</option>` +
+            displayCampuses.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+      }
+
+      const trackSelect = document.getElementById('trackFilter');
+      if (trackSelect) {
+        trackSelect.innerHTML = '<option value="">All Academic Tracks</option>' +
+          this.tracks.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      }
+
+      const semSelect = document.getElementById('semesterFilter');
+      if (semSelect) {
+        semSelect.innerHTML = '<option value="">All Active Semesters</option>' +
+          this.semesters.map(s => `<option value="${s.id}">${s.name} (${s.batch_name})</option>`).join('');
+      }
+    },
+
+    // -------------------------------------------------------------
+    // SECTION 11: ATTENDANCE MANAGEMENT CONTROLLER
+    // -------------------------------------------------------------
+    async loadAttendanceView() {
+      if (!this.user) return;
+      const role = this.user.role;
+
+      // Render header actions based on role
+      const headerActions = document.getElementById('attendanceHeaderActions');
+      if (headerActions) {
+        if (role === 'FACULTY' || role === 'ADMIN' || role === 'CAMPUS_MANAGER') {
+          headerActions.innerHTML = `
+            <button type="button" class="btn-primary" onclick="App.openStartAttendanceModal()">
+              ⏱️ + Initiate Class Attendance Session
+            </button>
+          `;
+        } else {
+          headerActions.innerHTML = '';
+        }
+      }
+
+      try {
+        const res = await API.getAttendanceRecords();
+        const records = res.records || [];
+        const summary = res.summary || {};
+
+        // Update KPI summary cards
+        const totalEl = document.getElementById('attSummaryTotal');
+        const presentEl = document.getElementById('attSummaryPresent');
+        const absentEl = document.getElementById('attSummaryAbsent');
+        const rateEl = document.getElementById('attSummaryRate');
+
+        const totalVal = summary.totalSessions !== undefined ? summary.totalSessions : records.length;
+        const presVal = summary.presentCount !== undefined ? summary.presentCount : records.filter(r => r.status === 'PRESENT').length;
+        const absVal = summary.absentCount !== undefined ? summary.absentCount : (totalVal - presVal);
+        const rateVal = totalVal > 0 ? Math.round((presVal / totalVal) * 100) : 100;
+
+        if (totalEl) totalEl.textContent = totalVal;
+        if (presentEl) presentEl.textContent = presVal;
+        if (absentEl) absentEl.textContent = absVal;
+        if (rateEl) rateEl.textContent = `${rateVal}%`;
+
+        // Check active attendance session
+        const activeRes = await API.getActiveAttendanceSessions();
+        const activeSessions = activeRes.activeSessions || [];
+
+        // Student active session card
+        const studentCard = document.getElementById('studentActiveAttendanceCard');
+        if (studentCard) {
+          if (role === 'STUDENT' && activeSessions.length > 0) {
+            const activeSess = activeSessions[0];
+            this.currentActiveAttendanceSessionId = activeSess.id;
+            const titleEl = document.getElementById('activeAttSubjectTitle');
+            const descEl = document.getElementById('activeAttFacultyInfo');
+            if (titleEl) titleEl.textContent = `🔴 Active Attendance: ${activeSess.subject_name} (${activeSess.subject_code})`;
+            if (descEl) descEl.textContent = `Conducted by ${activeSess.faculty_name} for ${activeSess.batch_name}. Click below to verify your presence.`;
+
+            const submitBtn = document.getElementById('btnSubmitStudentAttendance');
+            if (submitBtn) {
+              if (activeSess.hasSubmitted) {
+                submitBtn.textContent = '✅ Present Recorded';
+                submitBtn.disabled = true;
+                submitBtn.className = 'btn-secondary';
+              } else {
+                submitBtn.textContent = '✅ Mark Present Now';
+                submitBtn.disabled = false;
+                submitBtn.className = 'btn-primary';
+              }
+            }
+            studentCard.style.display = 'flex';
+          } else {
+            studentCard.style.display = 'none';
+          }
+        }
+
+        // Faculty active session card
+        const facCard = document.getElementById('facultyActiveSessionCard');
+        if (facCard) {
+          if ((role === 'FACULTY' || role === 'ADMIN' || role === 'CAMPUS_MANAGER') && activeSessions.length > 0) {
+            const activeSess = activeSessions[0];
+            this.currentActiveAttendanceSessionId = activeSess.id;
+            const titleEl = document.getElementById('facActiveSessionTitle');
+            const descEl = document.getElementById('facActiveSessionDesc');
+            if (titleEl) titleEl.textContent = `Active Attendance: ${activeSess.subject_name} (${activeSess.batch_name})`;
+            if (descEl) descEl.textContent = `Date: ${activeSess.session_date} • Submitted Students: ${activeSess.present_count || 0}`;
+            facCard.style.display = 'block';
+          } else {
+            facCard.style.display = 'none';
+          }
+        }
+
+        // Render attendance table
+        this.renderAttendanceTable(records);
+      } catch (err) {
+        console.error('Failed to load attendance view:', err);
+      }
+    },
+
+    renderAttendanceTable(records) {
+      const tbody = document.getElementById('attendanceTableBody');
+      if (!tbody) return;
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No attendance records found.</td></tr>';
+        return;
+      }
+
+      const isPrivileged = this.user.role === 'ADMIN' || this.user.role === 'CAMPUS_MANAGER' || this.user.role === 'FACULTY';
+
+      tbody.innerHTML = records.map(r => {
+        const studentInfo = r.student_name ? `${r.student_name} (${r.batch_name || 'Class'})` : (r.batch_name || 'Class');
+        const statusClass = r.status === 'PRESENT' ? 'ontrack' : (r.status === 'EXCUSED' ? 'tight' : 'danger');
+
+        return `
+          <tr>
+            <td><strong>${r.session_date}</strong></td>
+            <td>
+              <div style="font-weight: 700; color: var(--heading-deep-blue);">${r.subject_code}</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary);">${r.subject_name}</div>
+            </td>
+            <td>${studentInfo}</td>
+            <td>
+              <span class="status-pill ${statusClass}">${r.status}</span>
+            </td>
+            <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${r.marked_by}</span></td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">
+              ${r.created_at ? r.created_at.split(' ')[1] || r.created_at : '—'}
+            </td>
+            <td>
+              ${isPrivileged ? `
+                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.openEditAttendanceModal('${r.id}', '${r.student_name || 'Student'}', '${r.status}', '${(r.notes || '').replace(/'/g, "\\'")}')">
+                  ✏️ Correct
+                </button>
+              ` : `
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Verified</span>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    },
+
+    async openStartAttendanceModal() {
+      const modal = document.getElementById('startAttendanceModal');
+      const subjSelect = document.getElementById('attModalSubject');
+      if (subjSelect) {
+        try {
+          const data = await API.getSubjects();
+          const subjects = data.subjects || [];
+          subjSelect.innerHTML = subjects.map(s => `<option value="${s.id}">${s.code} - ${s.name} (${s.batch_name})</option>`).join('');
+          if (subjects[0]) {
+            const batchInput = document.getElementById('attModalBatch');
+            if (batchInput) batchInput.value = subjects[0].batch_name || 'Batch-2026-Mirai-A';
+          }
+        } catch (e) {}
+      }
+      if (modal) modal.style.display = 'flex';
+    },
+
+    async submitStartAttendance() {
+      const subjectId = document.getElementById('attModalSubject').value;
+      const batchName = document.getElementById('attModalBatch').value;
+      const campusId = document.getElementById('attModalCampus').value;
+
+      try {
+        await API.startAttendanceSession({
+          subject_id: subjectId,
+          batch_name: batchName,
+          campus_id: campusId
+        });
+        this.closeModal('startAttendanceModal');
+        this.showToast('Attendance session initiated! Students can now submit check-in.', 'success');
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Failed to initiate attendance: ${err.message}`, 'error');
+      }
+    },
+
+    async submitCurrentAttendance() {
+      if (!this.currentActiveAttendanceSessionId) return;
+      const submitBtn = document.getElementById('btnSubmitStudentAttendance');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+      }
+
+      try {
+        await API.submitAttendance(this.currentActiveAttendanceSessionId);
+        this.showToast('✅ Attendance recorded successfully! You are marked PRESENT.', 'success');
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Error: ${err.message}`, 'error');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '✅ Mark Present Now';
+        }
+      }
+    },
+
+    async closeCurrentAttendanceSession() {
+      if (!this.currentActiveAttendanceSessionId) return;
+      try {
+        await API.closeAttendanceSession(this.currentActiveAttendanceSessionId);
+        this.showToast('Attendance session ended and closed.', 'info');
+        this.currentActiveAttendanceSessionId = null;
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Failed to close session: ${err.message}`, 'error');
+      }
+    },
+
+    openEditAttendanceModal(id, studentName, status, notes) {
+      document.getElementById('editAttRecordId').value = id;
+      document.getElementById('editAttStudentName').value = studentName;
+      document.getElementById('editAttStatus').value = status;
+      document.getElementById('editAttNotes').value = notes || '';
+      const modal = document.getElementById('editAttendanceModal');
+      if (modal) modal.style.display = 'flex';
+    },
+
+    async submitEditAttendance() {
+      const id = document.getElementById('editAttRecordId').value;
+      const status = document.getElementById('editAttStatus').value;
+      const notes = document.getElementById('editAttNotes').value;
+
+      try {
+        await API.updateAttendanceRecord(id, { status, notes });
+        this.closeModal('editAttendanceModal');
+        this.showToast('Attendance record corrected and audited.', 'success');
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Error: ${err.message}`, 'error');
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 1: EXECUTIVE DASHBOARD (Section 5 Admin)
     // -------------------------------------------------------------
     async loadDashboard() {
       const container = document.getElementById('dashboardSubjectsTableBody');
@@ -273,7 +854,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         this.renderDashboardCharts(data.subjects, data.summary);
         this.renderDashboardTable(data.subjects);
       } catch (err) {
-        if (container) container.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--accent-rose); padding: 2rem;">Failed to load dashboard: ${err.message}</td></tr>`;
+        if (container) container.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--status-red-text); padding: 2rem;">Failed to load dashboard: ${err.message}</td></tr>`;
       }
     },
 
@@ -287,54 +868,54 @@ document.addEventListener('DOMContentLoaded', async () => {
       const title = document.getElementById('bannerTitle');
       const desc = document.getElementById('bannerDesc');
 
-      badge.textContent = summary.rolledUpTrackStatus;
-      badge.className = `banner-badge ${
-        summary.rolledUpTrackStatus === 'DANGER' ? 'badge-danger' :
-        summary.rolledUpTrackStatus === 'TIGHT' ? 'badge-tight' :
-        summary.rolledUpTrackStatus === 'ON TRACK' ? 'badge-ontrack' : 'badge-complete'
-      }`;
+      if (badge) {
+        badge.textContent = summary.rolledUpTrackStatus;
+        badge.className = `banner-badge ${
+          summary.rolledUpTrackStatus === 'DANGER' ? 'badge-danger' :
+          summary.rolledUpTrackStatus === 'TIGHT' ? 'badge-tight' :
+          summary.rolledUpTrackStatus === 'ON TRACK' ? 'badge-ontrack' : 'badge-complete'
+        }`;
+      }
 
-      if (summary.rolledUpTrackStatus === 'DANGER') {
-        title.textContent = 'Critical Alert: Track Status is in DANGER';
-        desc.textContent = 'Executive Warning: One or more subjects have a Buffer Ratio < 1.00. Track overall health is determined by the worst-performing subject, not an average.';
-      } else if (summary.rolledUpTrackStatus === 'TIGHT') {
-        title.textContent = 'Advisory: Track Status is TIGHT (1.00 <= Buffer < 1.15)';
-        desc.textContent = 'Attention Required: Syllabus progression has minimal buffer before target completion date. Schedule makeup sessions if needed.';
-      } else if (summary.rolledUpTrackStatus === 'ON TRACK') {
-        title.textContent = 'Optimal Progression: Track is ON TRACK (Buffer >= 1.15)';
-        desc.textContent = 'All enrolled subjects are scheduled comfortably with sufficient teaching hours remaining before examinations.';
-      } else {
-        title.textContent = 'Track Complete: All In-Scope Syllabus Delivered';
-        desc.textContent = '100% of curriculum topics have been completed for this semester.';
+      if (title && desc) {
+        if (summary.rolledUpTrackStatus === 'DANGER') {
+          title.textContent = 'Critical Alert: Track Status is in DANGER';
+          desc.textContent = `At least one subject (${summary.worstSubject ? summary.worstSubject.name : 'Unknown'}) has Buffer Ratio < 1.00. Immediate intervention required.`;
+        } else if (summary.rolledUpTrackStatus === 'TIGHT') {
+          title.textContent = 'Advisory: Academic Pace is TIGHT';
+          desc.textContent = 'One or more subjects have buffer ratios between 1.00 and 1.15. Keep watch on planned session delivery.';
+        } else if (summary.rolledUpTrackStatus === 'ON TRACK') {
+          title.textContent = 'Excellent: All Curriculum Delivery ON TRACK';
+          desc.textContent = 'All subjects maintain safe buffers (ratio >= 1.15). Delivery is keeping pace with targets.';
+        } else {
+          title.textContent = 'Curriculum Complete';
+          desc.textContent = 'All in-scope lesson topics delivered successfully across campuses.';
+        }
       }
     },
 
     renderDashboardKPIs(summary) {
-      const elTotal = document.getElementById('kpiTotalSubjects');
-      const elOnTrack = document.getElementById('kpiOnTrack');
-      const elTight = document.getElementById('kpiTight');
-      const elDanger = document.getElementById('kpiDanger');
-      const elCoverage = document.getElementById('kpiCoveragePercent');
+      const elTotal = document.getElementById('kpiTotalHours');
+      const elCovered = document.getElementById('kpiCoveredHours');
+      const elRemaining = document.getElementById('kpiRemainingHours');
+      const elAvailable = document.getElementById('kpiAvailableHours');
       const elBuffer = document.getElementById('kpiBufferRatio');
-      const elPace = document.getElementById('kpiPaceVsPlan');
       const elOverdue = document.getElementById('kpiOverdueTopics');
 
-      if (elTotal) elTotal.textContent = summary.totalSubjects;
-      if (elOnTrack) elOnTrack.textContent = summary.statusCounts.onTrack;
-      if (elTight) elTight.textContent = summary.statusCounts.tight;
-      if (elDanger) elDanger.textContent = summary.statusCounts.danger;
-      if (elCoverage) elCoverage.textContent = `${summary.hours.coveragePercent}%`;
-      if (elBuffer) elBuffer.textContent = summary.hours.bufferRatio >= 90 ? 'Complete' : summary.hours.bufferRatio;
+      if (elTotal) elTotal.textContent = formatDuration(summary.hours.inScope);
+      if (elCovered) elCovered.textContent = formatDuration(summary.hours.covered);
+      if (elRemaining) elRemaining.textContent = formatDuration(summary.hours.remaining);
+      if (elAvailable) elAvailable.textContent = formatDuration(summary.hours.available);
       
-      if (elPace) {
-        const paceVal = summary.hours.paceVsPlan;
-        elPace.textContent = `${paceVal > 0 ? '+' : ''}${paceVal} hrs`;
-        elPace.style.color = paceVal < 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)';
+      if (elBuffer) {
+        elBuffer.textContent = summary.hours.bufferRatio !== null ? summary.hours.bufferRatio : 'N/A';
+        elBuffer.style.color = summary.rolledUpTrackStatus === 'DANGER' ? '#EF4444' :
+                               summary.rolledUpTrackStatus === 'TIGHT' ? '#F59E0B' : '#10B981';
       }
 
       if (elOverdue) {
         elOverdue.textContent = summary.hours.overdueTopics;
-        elOverdue.style.color = summary.hours.overdueTopics > 0 ? 'var(--accent-rose)' : 'var(--text-main)';
+        elOverdue.style.color = summary.hours.overdueTopics > 0 ? '#EF4444' : 'var(--text-main)';
       }
     },
 
@@ -347,8 +928,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (this.charts.hours) this.charts.hours.destroy();
 
         const labels = subjects.map(s => s.code);
-        const plannedData = subjects.map(s => s.hoursInScope);
         const coveredData = subjects.map(s => s.coveredHours);
+        const remainingData = subjects.map(s => s.remainingHours);
         const availableData = subjects.map(s => s.availableHours);
 
         this.charts.hours = new Chart(hoursCanvas, {
@@ -359,19 +940,19 @@ document.addEventListener('DOMContentLoaded', async () => {
               {
                 label: 'Covered Hours',
                 data: coveredData,
-                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                backgroundColor: 'rgba(16, 185, 129, 0.85)',
                 borderRadius: 4
               },
               {
                 label: 'Remaining Hours',
-                data: subjects.map(s => s.remainingHours),
-                backgroundColor: 'rgba(239, 68, 68, 0.75)',
+                data: remainingData,
+                backgroundColor: 'rgba(245, 158, 11, 0.85)',
                 borderRadius: 4
               },
               {
-                label: 'Available Scheduled Hours',
+                label: 'Available Hours',
                 data: availableData,
-                backgroundColor: 'rgba(6, 182, 212, 0.75)',
+                backgroundColor: 'rgba(57, 120, 212, 0.85)',
                 borderRadius: 4
               }
             ]
@@ -381,18 +962,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             maintainAspectRatio: false,
             plugins: {
               legend: {
-                labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                labels: { color: '#244B80', font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' } }
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${formatDuration(ctx.raw)} (${ctx.raw} hrs)`
+                }
               }
             },
             scales: {
               x: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8' }
+                grid: { color: '#C3D8F2' },
+                ticks: { color: '#647A96', font: { family: 'Plus Jakarta Sans', size: 11 } }
               },
               y: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8' },
-                title: { display: true, text: 'Teaching Hours', color: '#64748b' }
+                grid: { color: '#C3D8F2' },
+                ticks: { color: '#647A96', font: { family: 'Plus Jakarta Sans', size: 11 } },
+                title: { display: true, text: 'Hours', color: '#244B80', font: { family: 'Plus Jakarta Sans', weight: '700' } }
               }
             }
           }
@@ -416,10 +1002,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 summary.statusCounts.complete
               ],
               backgroundColor: [
-                '#10b981',
-                '#f59e0b',
-                '#ef4444',
-                '#06b6d4'
+                '#10B981',
+                '#F59E0B',
+                '#EF4444',
+                '#3978D4'
               ],
               borderWidth: 0
             }]
@@ -430,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                labels: { color: '#244B80', font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' } }
               }
             },
             cutout: '70%'
@@ -449,37 +1035,42 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       container.innerHTML = subjects.map(s => {
-        const paceClass = s.paceVsPlan < 0 ? 'color: var(--accent-rose); font-weight: 700;' : 'color: var(--accent-emerald); font-weight: 700;';
-        const bufferDisplay = s.status === 'COMPLETE' ? 'Complete' : s.bufferRatio;
+        const paceSign = s.paceVsPlan > 0 ? '+' : s.paceVsPlan < 0 ? '-' : '';
+        const paceFormatted = `${paceSign}${formatDuration(Math.abs(s.paceVsPlan))}`;
+        const statusClass = s.status === 'ON TRACK' ? 'ontrack' : s.status === 'TIGHT' ? 'tight' : s.status === 'DANGER' ? 'danger' : 'complete';
 
         return `
           <tr>
             <td>
-              <div style="font-weight: 700; font-size: 0.95rem;">${s.code}</div>
-              <div style="font-size: 0.75rem; color: var(--text-dim);">${s.name}</div>
+              <div style="font-weight: 700; color: var(--heading-deep-blue);">${s.code}</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary);">${s.name}</div>
             </td>
             <td>
-              <div style="font-size: 0.8rem;">${s.campusName}</div>
-              <div style="font-size: 0.7rem; color: var(--text-dim);">${s.batchName}</div>
+              <div style="font-size: 0.85rem;">${s.batch_name}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">${s.campus_name}</div>
             </td>
-            <td style="font-family: 'JetBrains Mono';">${s.hoursInScope}</td>
-            <td style="font-family: 'JetBrains Mono'; color: var(--accent-emerald);">${s.coveredHours}</td>
-            <td style="font-family: 'JetBrains Mono'; color: ${s.remainingHours > 0 ? 'var(--accent-amber)' : 'var(--text-muted)'};">${s.remainingHours}</td>
-            <td style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">${s.availableHours}</td>
-            <td style="font-family: 'JetBrains Mono'; font-weight: 700;">${bufferDisplay}</td>
-            <td>
-              <div style="font-size: 0.8rem; font-weight: 700;">${s.coveragePercent}%</div>
-              <div class="progress-bar-container" style="width: 80px;">
-                <div class="progress-bar-fill" style="width: ${s.coveragePercent}%; background: ${s.status === 'DANGER' ? 'var(--accent-rose)' : 'var(--accent-emerald)'};"></div>
+            <td style="font-family: 'JetBrains Mono', monospace;">${formatDuration(s.hoursInScope)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: #10B981;">${formatDuration(s.coveredHours)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: #F59E0B;">${formatDuration(s.remainingHours)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--primary-blue);">${formatDuration(s.availableHours)}</td>
+            <td style="min-width: 120px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.2rem;">
+                <span>${s.progressPercentage}%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" style="width: ${s.progressPercentage}%;"></div>
               </div>
             </td>
-            <td style="${paceClass}">
-              ${s.paceVsPlan > 0 ? '+' : ''}${s.paceVsPlan} hrs
+            <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">
+              ${s.bufferRatio !== null ? s.bufferRatio : '—'}
+            </td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${s.paceVsPlan < 0 ? '#EF4444' : '#10B981'};">
+              ${paceFormatted}
             </td>
             <td>
-              <span class="badge-status ${s.status.replace(' ', '_')}">${s.status}</span>
-              <button class="btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; margin-left: 0.4rem;" onclick="App.showTraceabilityModal('${s.subjectId}')">
-                Trace 🔍
+              <span class="status-pill ${statusClass}">${s.status}</span>
+              <button type="button" class="btn-secondary" style="font-size: 0.68rem; padding: 0.15rem 0.4rem; margin-left: 0.35rem;" onclick="App.inspectTraceability('${s.id}')">
+                Inspect
               </button>
             </td>
           </tr>
@@ -487,71 +1078,320 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).join('');
     },
 
-    showTraceabilityModal(subjectId) {
-      if (!this.dashboardData) return;
-      const subj = this.dashboardData.subjects.find(s => s.subjectId === subjectId);
-      if (!subj) return;
-
+    async inspectTraceability(subjectId) {
       const modal = document.getElementById('traceabilityModal');
       const body = document.getElementById('traceabilityModalBody');
       if (!modal || !body) return;
 
-      body.innerHTML = `
-        <div style="margin-bottom: 1rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff;">${subj.code}: ${subj.name}</h3>
-          <p style="font-size: 0.8rem; color: var(--text-muted);">${subj.campusName} • ${subj.trackName} (${subj.batchName})</p>
-        </div>
+      body.innerHTML = '<div style="padding: 2rem; text-align: center;">Calculating mathematical traceability...</div>';
+      modal.style.display = 'flex';
 
-        <div class="trace-formula-box">
-          <div style="color: #fff; font-weight: 700; margin-bottom: 0.25rem;">1. Buffer Ratio Formula:</div>
-          <div>bufferRatio = availableHours / remainingHours</div>
-          <div style="color: var(--text-main); margin-top: 0.25rem;">
-            ${subj.availableHours} available hrs / ${subj.remainingHours} remaining hrs = <strong>${subj.bufferRatio}</strong>
+      try {
+        const data = await API.getSubjectTraceability(subjectId);
+        const subj = data.subject;
+
+        body.innerHTML = `
+          <div style="margin-bottom: 1.25rem;">
+            <h4 style="font-size: 1.15rem; color: var(--heading-deep-blue);">${subj.code}: ${subj.name}</h4>
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">${subj.campus_name} • ${subj.batch_name}</div>
           </div>
-          <div style="margin-top: 0.35rem; color: ${subj.status === 'DANGER' ? 'var(--accent-rose)' : subj.status === 'TIGHT' ? 'var(--accent-amber)' : 'var(--accent-emerald)'};">
-            → Threshold Classification: <strong>${subj.status}</strong> (${subj.bufferRatio >= 1.15 ? 'Ratio >= 1.15 (ON TRACK)' : subj.bufferRatio >= 1.00 ? '1.00 <= Ratio < 1.15 (TIGHT)' : 'Ratio < 1.00 (DANGER)'})
+
+          <div style="background-color: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+            <div style="font-weight: 700; color: var(--heading-deep-blue);">1. Buffer Ratio Formula:</div>
+            <div style="font-size: 0.85rem; margin-top: 0.2rem;">bufferRatio = availableHours / remainingHours</div>
+            <div style="margin-top: 0.35rem; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem;">
+              ${formatDuration(subj.availableHours)} available / ${formatDuration(subj.remainingHours)} remaining = <strong>${subj.bufferRatio}</strong>
+            </div>
           </div>
-        </div>
 
-        <div class="trace-formula-box">
-          <div style="color: #fff; font-weight: 700; margin-bottom: 0.25rem;">2. Pace vs Plan Formula:</div>
-          <div>paceVsPlan = coveredHours - hoursExpectedByToday</div>
-          <div style="color: var(--text-main); margin-top: 0.25rem;">
-            ${subj.coveredHours} covered hrs - ${subj.hoursExpectedByToday} expected hrs = <strong>${subj.paceVsPlan} hrs</strong>
+          <div style="background-color: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+            <div style="font-weight: 700; color: var(--heading-deep-blue);">2. Pace vs Plan Formula:</div>
+            <div style="font-size: 0.85rem; margin-top: 0.2rem;">paceVsPlan = coveredHours - hoursExpectedByToday</div>
+            <div style="margin-top: 0.35rem; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem;">
+              ${formatDuration(subj.coveredHours)} covered - ${formatDuration(subj.hoursExpectedByToday)} expected = <strong>${subj.paceVsPlan > 0 ? '+' : ''}${formatDuration(Math.abs(subj.paceVsPlan))}</strong>
+            </div>
           </div>
-          <div style="margin-top: 0.35rem; color: ${subj.paceVsPlan < 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)'};">
-            ${subj.paceVsPlan < 0 ? '⚠️ Behind Schedule: Academic delay of ' + Math.abs(subj.paceVsPlan) + ' teaching hours' : '✅ Ahead / On Schedule'}
+
+          <div style="background-color: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 1rem;">
+            <div style="font-weight: 700; color: var(--heading-deep-blue);">3. Overdue Topics: ${subj.overdueTopicsCount}</div>
+            ${subj.overdueTopics && subj.overdueTopics.length > 0 ? `
+              <ul style="margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.8rem; color: #EF4444;">
+                ${subj.overdueTopics.map(t => `<li><strong>${t.title}</strong> (Planned: ${t.planned_date}, ${formatDuration(t.planned_hours)})</li>`).join('')}
+              </ul>
+            ` : '<div style="color: #10B981; font-size: 0.85rem; margin-top: 0.25rem;">No overdue topics.</div>'}
           </div>
-        </div>
-
-        <div class="trace-formula-box">
-          <div style="color: #fff; font-weight: 700; margin-bottom: 0.25rem;">3. Overdue Topics Count:</div>
-          <div>Total Overdue: <strong>${subj.overdueTopicsCount}</strong> topic(s) whose planned date has passed but are not completed.</div>
-          ${subj.overdueTopics.length > 0 ? `
-            <ul style="margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.75rem; color: #fca5a5;">
-              ${subj.overdueTopics.map(t => `<li><strong>${t.title}</strong> (Planned: ${t.planned_date}, Status: ${t.status}, ${t.completion_percentage}%)</li>`).join('')}
-            </ul>
-          ` : '<div style="color: var(--accent-emerald); margin-top: 0.25rem;">No overdue topics.</div>'}
-        </div>
-
-        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 1rem;">
-          Calculated as of <strong>${subj.asOfDate}</strong> against Target Finish Date <strong>${subj.targetFinishDate}</strong> (Working Saturdays Rule: SECOND_AND_FOURTH).
-        </div>
-      `;
-
-      modal.classList.add('active');
+        `;
+      } catch (err) {
+        body.innerHTML = `<div style="color: #EF4444; padding: 1rem;">Error: ${err.message}</div>`;
+      }
     },
 
     closeModal(modalId) {
+      if (modalId === 'sessionLoggerModal') {
+        this.stopStopwatch();
+      }
       const modal = document.getElementById(modalId);
-      if (modal) modal.classList.remove('active');
+      if (modal) modal.style.display = 'none';
     },
 
     // -------------------------------------------------------------
-    // TAB 2: DAILY FACULTY SESSION LOGGER (<60s Flow)
+    // TAB 2: CURRICULUM & LESSON PLANS (Section 5)
+    // -------------------------------------------------------------
+    async loadCurriculumView() {
+      const container = document.getElementById('curriculumSubjectsContainer');
+      if (!container) return;
+
+      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading curriculum subjects...</div>';
+
+      try {
+        const data = await API.getSubjects();
+        const subjects = data.subjects || [];
+
+        if (subjects.length === 0) {
+          container.innerHTML = '<div class="content-card" style="padding: 2rem; text-align:center;">No subjects found.</div>';
+          return;
+        }
+
+        container.innerHTML = subjects.map(s => `
+          <div class="content-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="status-pill complete" style="margin-bottom: 0.35rem;">${s.code}</span>
+                <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-top: 0.25rem;">${s.name}</h3>
+                <p style="font-size: 0.82rem; color: var(--text-secondary);">${s.campus_name} • ${s.track_name || 'Academic Track'} (${s.batch_name})</p>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-weight: 700; color: var(--primary-blue); font-size: 0.95rem;">${formatDuration(s.total_hours)} Scope</span>
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--borders-subtle); padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">${s.active_semester_name || 'Active Semester'}</span>
+              <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;" onclick="App.showStudentTopicBreakdown('${s.id}')">
+                📖 View Lesson Plan & Syllabus
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error loading subjects: ${err.message}</div>`;
+      }
+    },
+
+    async showStudentTopicBreakdown(subjectId) {
+      const modal = document.getElementById('studentTopicsModal');
+      const body = document.getElementById('studentTopicsModalBody');
+      if (!modal || !body) return;
+
+      body.innerHTML = '<div style="padding: 2rem; text-align: center;">Loading lesson syllabus...</div>';
+      modal.style.display = 'flex';
+
+      try {
+        const data = await API.getSubjectTopics(subjectId);
+        const topics = data.topics || [];
+
+        body.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 60vh; overflow-y: auto;">
+            ${topics.map(t => `
+              <div style="background-color: var(--surface-soft); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--borders); display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 700; color: var(--heading-deep-blue);">
+                    ${t.status === 'COMPLETED' ? '✅' : t.status === 'IN_PROGRESS' ? '⏳' : '⚪'} 
+                    Unit ${t.unit_number}: ${t.topic_title}
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                    Planned Date: <strong>${t.planned_date || 'TBD'}</strong> • Scope: ${t.exam_scope}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <span class="status-pill ${t.status === 'COMPLETED' ? 'complete' : (t.status === 'IN_PROGRESS' ? 'ontrack' : 'tight')}" style="font-size: 0.72rem;">${t.status}</span>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${formatDuration(t.planned_hours)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (err) {
+        body.innerHTML = `<div style="color: #EF4444;">Error: ${err.message}</div>`;
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 3: TIMETABLE & CALENDAR
+    // -------------------------------------------------------------
+    async loadCalendarAndTimetable() {
+      const container = document.getElementById('timetableGridContainer') || document.getElementById('timetableContainer');
+      if (!container) return;
+
+      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading academic timetable...</div>';
+
+      try {
+        const tData = await API.getTimetable(this.activeFilters);
+        const slots = tData.slots || [];
+        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        container.innerHTML = `
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-top: 1rem;">
+            ${weekdays.map((dayName, idx) => {
+              const dow = idx + 1;
+              const daySlots = slots.filter(s => s.weekday === dow);
+
+              return `
+                <div class="content-card" style="margin-bottom: 0; padding: 1.25rem;">
+                  <div style="font-weight: 800; font-size: 1rem; margin-bottom: 0.85rem; color: var(--heading-deep-blue); display: flex; justify-content: space-between;">
+                    <span>${dayName}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">${daySlots.length} slot(s)</span>
+                  </div>
+
+                  ${daySlots.length === 0 ? `
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 1.5rem 0;">No classes scheduled</div>
+                  ` : `
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                      ${daySlots.map(s => `
+                        <div style="background-color: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-sm); padding: 0.75rem;">
+                          <div style="display: flex; justify-content: space-between; font-weight: 700;">
+                            <span style="color: var(--heading-deep-blue);">${s.subject_code}</span>
+                            <span style="color: var(--primary-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(s.duration_hours)}</span>
+                          </div>
+                          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem;">${s.start_time} - ${s.end_time} • ${s.faculty_name}</div>
+                          <div style="font-size: 0.72rem; color: var(--text-muted);">${s.batch_name} (${s.room || 'Room 101'})</div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  `}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
+      }
+    },
+
+    openAddHolidayModal() {
+      const modal = document.getElementById('addHolidayModal');
+      if (modal) modal.style.display = 'flex';
+    },
+
+    async submitAddHoliday() {
+      const semId = this.activeFilters.semester_id || (this.semesters[0] ? this.semesters[0].id : 'sem_hitech_mirai_a');
+      const eventDate = document.getElementById('holidayDateInput').value;
+      const title = document.getElementById('holidayTitleInput').value;
+      const eventType = document.getElementById('holidayTypeSelect').value;
+
+      if (!eventDate || !title) {
+        this.showToast('Please enter both event date and title', 'warning');
+        return;
+      }
+
+      try {
+        await API.addCalendarEvent(semId, {
+          event_date: eventDate,
+          title,
+          event_type: eventType,
+          affects_schedule: 1
+        });
+        this.closeModal('addHolidayModal');
+        this.showToast('Holiday added! Affected syllabus dates recalculated.', 'success');
+        await this.loadCalendarAndTimetable();
+      } catch (err) {
+        this.showToast(`Error adding holiday: ${err.message}`, 'error');
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 4: USER ACCOUNTS (Admin)
+    // -------------------------------------------------------------
+    async loadUsersView() {
+      const tbody = document.getElementById('usersTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading accounts...</td></tr>';
+
+      try {
+        const data = await API.getUsers();
+        const users = data.users || [];
+
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No user accounts found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => `
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: var(--heading-deep-blue);">${u.name}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">ID: ${u.id}</div>
+            </td>
+            <td>${u.email}</td>
+            <td>${u.phone || '—'}</td>
+            <td>
+              <span class="status-pill complete" style="font-size: 0.72rem;">${u.role.replace('_', ' ')}</span>
+            </td>
+            <td>${u.campus_name || 'All Campuses'}</td>
+            <td>${u.batch_name || '—'}</td>
+            <td><span class="status-pill ontrack">Active</span></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #EF4444; padding: 2rem;">Error: ${err.message}</td></tr>`;
+      }
+    },
+
+    openAddUserModal() {
+      const modal = document.getElementById('addUserModal');
+      const err = document.getElementById('addUserError');
+      if (err) err.style.display = 'none';
+      if (modal) modal.style.display = 'flex';
+    },
+
+    handleNewUserRoleChange() {
+      const role = document.getElementById('newUserRole').value;
+      const batchGroup = document.getElementById('newUserBatchGroup');
+      if (batchGroup) {
+        batchGroup.style.display = role === 'STUDENT' ? 'block' : 'none';
+      }
+    },
+
+    async submitCreateUser() {
+      const name = document.getElementById('newUserName').value;
+      const email = document.getElementById('newUserEmail').value;
+      const phone = document.getElementById('newUserPhone').value;
+      const role = document.getElementById('newUserRole').value;
+      const campusId = document.getElementById('newUserCampus').value;
+      const batchName = document.getElementById('newUserBatch').value;
+      const password = document.getElementById('newUserPassword').value;
+
+      const errBox = document.getElementById('addUserError');
+      const errMsg = document.getElementById('addUserErrorMsg');
+
+      try {
+        await API.createUser({
+          name,
+          email,
+          phone: phone || null,
+          role,
+          campus_id: campusId,
+          batch_name: role === 'STUDENT' ? batchName : null,
+          password
+        });
+        this.closeModal('addUserModal');
+        this.showToast(`User account for ${name} created successfully!`, 'success');
+        await this.loadUsersView();
+      } catch (err) {
+        if (errBox) {
+          errBox.style.display = 'flex';
+          if (errMsg) errMsg.textContent = err.message;
+        }
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 7: FAST SESSION LOGGER (<60s Flow for Faculty)
     // -------------------------------------------------------------
     async loadTodayLogger() {
-      const listContainer = document.getElementById('todaySessionsList');
+      const listContainer = document.getElementById('loggerTodaySlotsContainer') || document.getElementById('todaySessionsList');
       if (!listContainer) return;
 
       listContainer.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading today\'s teaching schedule...</div>';
@@ -560,14 +1400,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await API.getTodaySessions();
         this.todaySessionsData = data;
 
-        const datePill = document.getElementById('loggerDateDisplay');
-        if (datePill) datePill.textContent = `${data.dayName}, ${data.activeDate}`;
-
         if (!data.sessions || data.sessions.length === 0) {
           listContainer.innerHTML = `
-            <div class="glass-card" style="text-align:center; padding: 2rem;">
-              <p style="color: var(--text-muted); font-size: 0.95rem;">No timetable sessions scheduled for ${data.dayName} (${data.activeDate}) for this profile.</p>
-              <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">Switch role to <strong>Dr. Aris Thorne (Faculty)</strong> or change weekday in timetable.</p>
+            <div class="content-card" style="text-align:center; padding: 2.5rem;">
+              <p style="color: var(--text-secondary); font-size: 1rem;">No timetable sessions scheduled for ${data.dayName} (${data.activeDate}) for this profile.</p>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">Check your timetable slots or advance the simulation date.</p>
             </div>
           `;
           return;
@@ -579,22 +1416,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           const nextTopic = item.suggestedTopic;
 
           return `
-            <div class="glass-card" style="margin-bottom: 1rem; border-left: 4px solid ${isLogged ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <div class="content-card" style="margin-bottom: 1.25rem; border-left: 5px solid ${isLogged ? '#10B981' : '#F59E0B'};">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
                 <div>
-                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase;">
-                    ${s.start_time} - ${s.end_time} (${s.duration_hours} hrs) • ${s.room || 'Main Hall'}
+                  <span style="font-size: 0.78rem; font-weight: 700; color: var(--primary-blue); text-transform: uppercase;">
+                    ${s.start_time} - ${s.end_time} (${formatDuration(s.duration_hours)}) • ${s.room || 'Main Hall'}
                   </span>
-                  <h4 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-top: 0.15rem;">
+                  <h4 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-top: 0.2rem;">
                     ${s.subject_code}: ${s.subject_name}
                   </h4>
-                  <p style="font-size: 0.8rem; color: var(--text-muted);">${s.campus_name} • ${s.batch_name}</p>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary);">${s.campus_name} • ${s.batch_name}</p>
                 </div>
                 <div>
                   ${isLogged ? `
-                    <span class="badge-status COMPLETE">Logged (${item.loggedSession.status})</span>
+                    <span class="status-pill complete">Logged (${item.loggedSession.status})</span>
                   ` : `
-                    <button class="btn-primary" style="padding: 0.45rem 0.9rem; font-size: 0.8rem;" onclick="App.openInstantLogger(${idx})">
+                    <button type="button" class="btn-primary" onclick="App.openInstantLogger(${idx})">
                       ⚡ Quick Log (under 60s)
                     </button>
                   `}
@@ -602,19 +1439,19 @@ document.addEventListener('DOMContentLoaded', async () => {
               </div>
 
               ${nextTopic ? `
-                <div style="background: rgba(15, 23, 42, 0.6); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background-color: var(--surface-soft); padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
                   <div>
-                    <span style="color: var(--text-dim); font-weight: 600;">Next In Sequence:</span>
-                    <strong style="color: #fff; margin-left: 0.25rem;">Unit ${nextTopic.unit_number}: ${nextTopic.topic_title}</strong>
+                    <span style="color: var(--text-secondary); font-weight: 600;">Next Topic in Sequence:</span>
+                    <strong style="color: var(--heading-deep-blue); margin-left: 0.35rem;">Unit ${nextTopic.unit_number}: ${nextTopic.topic_title}</strong>
                   </div>
-                  <span style="color: var(--accent-indigo); font-family: 'JetBrains Mono'; font-weight: 700;">${nextTopic.planned_hours} hrs</span>
+                  <span style="color: var(--primary-blue); font-family: 'JetBrains Mono', monospace; font-weight: 700;">${formatDuration(nextTopic.planned_hours)}</span>
                 </div>
               ` : ''}
             </div>
           `;
         }).join('');
       } catch (err) {
-        listContainer.innerHTML = `<div style="color: var(--accent-rose); padding: 1.5rem;">Error loading schedule: ${err.message}</div>`;
+        listContainer.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
       }
     },
 
@@ -633,8 +1470,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('logModalTopicId').value = topic ? topic.id : '';
 
       document.getElementById('logModalHeaderInfo').innerHTML = `
-        <strong>${s.subject_code} - ${s.subject_name}</strong><br>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">${s.batch_name} • ${s.start_time} - ${s.end_time} (${s.duration_hours} hrs)</span>
+        <strong style="color: var(--heading-deep-blue); font-size: 1rem;">${s.subject_code} - ${s.subject_name}</strong><br>
+        <span style="font-size: 0.82rem; color: var(--text-secondary);">${s.batch_name} • ${s.start_time} - ${s.end_time} (${formatDuration(s.duration_hours)})</span>
       `;
 
       if (topic) {
@@ -643,18 +1480,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('logModalTopicInput').value = '';
       }
 
-      // Reset stopwatch
       this.startStopwatch();
-
-      // Reset status chips to COMPLETED
       this.selectStatusChip('COMPLETED');
       this.selectPctPill(100);
 
-      modal.classList.add('active');
+      if (modal) modal.style.display = 'flex';
     },
 
     startStopwatch() {
-      clearInterval(this.stopwatchInterval);
+      if (this.stopwatchInterval) {
+        clearInterval(this.stopwatchInterval);
+        this.stopwatchInterval = null;
+      }
       this.stopwatchSeconds = 0;
       const el = document.getElementById('loggerStopwatchTimer');
       if (el) el.textContent = '00:00';
@@ -668,7 +1505,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     stopStopwatch() {
-      clearInterval(this.stopwatchInterval);
+      if (this.stopwatchInterval) {
+        clearInterval(this.stopwatchInterval);
+        this.stopwatchInterval = null;
+      }
       return this.stopwatchSeconds;
     },
 
@@ -735,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           duration_hours: durationHours
         };
 
-        const res = await API.logSession(payload);
+        await API.logSession(payload);
         this.closeModal('sessionLoggerModal');
         this.showToast(`Logged in ${elapsed} seconds! Progress updated.`, 'success');
         await this.loadTodayLogger();
@@ -745,396 +1585,255 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     // -------------------------------------------------------------
-    // TAB 3: EXAM READINESS HUB
+    // TAB 8: SESSION HISTORY (Faculty)
     // -------------------------------------------------------------
-    async loadExamReadiness() {
-      const container = document.getElementById('examCardsContainer');
-      if (!container) return;
+    async loadSessionHistory() {
+      const tbody = document.getElementById('sessionHistoryTableBody');
+      if (!tbody) return;
 
-      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Evaluating examination readiness models...</div>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading teaching history...</td></tr>';
 
       try {
-        const data = await API.getExamReadiness(this.activeFilters.semester_id);
-        const exams = data.exams || [];
+        const data = await API.getSessionHistory();
+        const sessions = data.sessions || [];
 
-        if (exams.length === 0) {
-          container.innerHTML = '<div class="glass-card" style="padding: 2rem; text-align: center;">No upcoming examinations configured for this semester.</div>';
+        if (sessions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No teaching sessions recorded yet.</td></tr>';
           return;
         }
 
-        container.innerHTML = exams.map(exam => {
-          const riskBadgeClass = exam.riskStatus === 'READY' ? 'badge-ontrack' :
-                                exam.riskStatus === 'LOW_RISK' ? 'badge-ontrack' :
-                                exam.riskStatus === 'MEDIUM_RISK' ? 'badge-tight' : 'badge-danger';
-
-          return `
-            <div class="glass-card exam-card">
-              <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                  <span class="banner-badge ${riskBadgeClass}">
-                    ${exam.riskStatus.replace('_', ' ')}
-                  </span>
-                  <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">
-                    ${exam.weightage}% Semester Weight
-                  </span>
-                </div>
-
-                <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 0.25rem;">
-                  ${exam.name}
-                </h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-                  📅 Exam Window: <strong>${exam.startDate}</strong> to <strong>${exam.endDate}</strong>
-                </p>
-
-                <div style="margin-bottom: 1rem;">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.25rem;">
-                    <span>Syllabus Scope Covered</span>
-                    <span>${exam.coveragePercent}% (${exam.coveredHours} / ${exam.inScopeHours} hrs)</span>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: ${exam.coveragePercent}%; background: ${exam.riskStatus === 'HIGH_RISK' ? 'var(--accent-rose)' : 'var(--accent-emerald)'};"></div>
-                  </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.75rem; background: rgba(15, 23, 42, 0.5); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
-                  <div>
-                    <div style="color: var(--text-dim);">Remaining Scope:</div>
-                    <strong style="color: #fff; font-family: 'JetBrains Mono';">${exam.remainingHours} hrs</strong>
-                  </div>
-                  <div>
-                    <div style="color: var(--text-dim);">Teaching Hours Before Exam:</div>
-                    <strong style="color: var(--accent-cyan); font-family: 'JetBrains Mono';">${exam.availableHoursBeforeExam} hrs</strong>
-                  </div>
-                </div>
-
-                <div>
-                  <h5 style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.35rem;">Subject Readiness Breakdown:</h5>
-                  ${exam.subjects.map(s => `
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border-glass);">
-                      <span><strong>${s.code}</strong> (${s.coveredHours}/${s.inScopeHours} hrs)</span>
-                      <span class="badge-status ${s.riskStatus.replace('_', ' ')}" style="font-size: 0.65rem; padding: 0.15rem 0.4rem;">${s.riskStatus.replace('_', ' ')}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('');
+        tbody.innerHTML = sessions.map(s => `
+          <tr>
+            <td><strong>${s.session_date}</strong></td>
+            <td>
+              <div style="font-weight: 700; color: var(--heading-deep-blue);">${s.subject_code}</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary);">${s.subject_name}</div>
+            </td>
+            <td>${s.batch_name}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--primary-blue);">${formatDuration(s.duration_hours)}</td>
+            <td>
+              <span class="status-pill complete">${s.percentage_complete}%</span>
+            </td>
+            <td>${s.topics_covered || '—'}</td>
+            <td>
+              <div style="font-size: 0.78rem;">${s.classwork_status || '—'}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">${s.homework_status || ''}</div>
+            </td>
+          </tr>
+        `).join('');
       } catch (err) {
-        container.innerHTML = `<div style="color: var(--accent-rose); padding: 1.5rem;">Error: ${err.message}</div>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #EF4444; padding: 2rem;">Error: ${err.message}</td></tr>`;
       }
     },
 
     // -------------------------------------------------------------
-    // TAB 4: STUDENT PORTAL (Read-Only)
+    // TAB 9: STUDENT PORTAL VIEW (Section 5 Student)
     // -------------------------------------------------------------
     async loadStudentView() {
-      const container = document.getElementById('studentPortalContent');
+      const container = document.getElementById('studentSubjectsContainer');
       if (!container) return;
 
-      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading student syllabus and exam milestones...</div>';
+      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading your enrolled subjects...</div>';
 
       try {
-        const batchName = (this.user && this.user.batch_name) ? this.user.batch_name : 'Batch-2026-Mirai-A';
-        const data = await API.getDashboard({ batch_name: batchName });
+        const data = await API.getStudentProgress();
+        const subjects = data.subjects || [];
 
-        container.innerHTML = `
-          <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-cyan);">
-            <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff;">🎓 Student Academic Hub</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
-              Enrolled Batch: <strong>${batchName}</strong> • Real-time curriculum completion tracking and upcoming examinations
-            </p>
-          </div>
+        if (subjects.length === 0) {
+          container.innerHTML = '<div class="content-card" style="text-align:center; padding: 2rem;">No enrolled subjects found.</div>';
+          return;
+        }
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
-            ${data.subjects.map(subj => `
-              <div class="glass-card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-                  <div>
-                    <h4 style="font-size: 1.1rem; font-weight: 800; color: #fff;">${subj.code}</h4>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);">${subj.name}</p>
-                  </div>
-                  <span class="badge-status ${subj.status.replace(' ', '_')}">${subj.status}</span>
-                </div>
-
-                <div style="margin-bottom: 0.75rem;">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.25rem;">
-                    <span>Course Progression</span>
-                    <span>${subj.coveragePercent}%</span>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: ${subj.coveragePercent}%; background: var(--accent-emerald);"></div>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">
-                    <span>${subj.coveredHours} hrs covered</span>
-                    <span>${subj.remainingHours} hrs remaining</span>
-                  </div>
-                </div>
-
-                <div style="border-top: 1px solid var(--border-glass); padding-top: 0.75rem;">
-                  <button class="btn-secondary" style="width: 100%; justify-content: center;" onclick="App.showStudentTopicBreakdown('${subj.subjectId}')">
-                    📖 View Syllabus & Topics
-                  </button>
+        container.innerHTML = subjects.map(s => `
+          <div class="content-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <span class="status-pill complete" style="margin-bottom: 0.25rem;">${s.code}</span>
+                <h3 style="font-size: 1.25rem; color: var(--heading-deep-blue); margin-top: 0.25rem;">${s.name}</h3>
+                <p style="font-size: 0.82rem; color: var(--text-secondary);">Faculty: <strong>${s.faculty_name}</strong></p>
+              </div>
+              <div style="text-align: right;">
+                <span class="status-pill ontrack">${s.progressPercentage}% Completed</span>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-muted); margin-top: 0.35rem;">
+                  ${formatDuration(s.coveredHours)} / ${formatDuration(s.total_hours)}
                 </div>
               </div>
-            `).join('')}
-          </div>
-        `;
-      } catch (err) {
-        container.innerHTML = `<div style="color: var(--accent-rose); padding: 1.5rem;">Error loading student view: ${err.message}</div>`;
-      }
-    },
-
-    async showStudentTopicBreakdown(subjectId) {
-      const modal = document.getElementById('studentTopicsModal');
-      const body = document.getElementById('studentTopicsModalBody');
-      if (!modal || !body) return;
-
-      body.innerHTML = '<div>Loading syllabus topics...</div>';
-      modal.classList.add('active');
-
-      try {
-        const data = await API.getSubjectTopics(subjectId);
-        const topics = data.topics || [];
-
-        body.innerHTML = `
-          <div style="margin-bottom: 1rem;">
-            <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff;">Syllabus Topic Breakdown</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted);">Verified topics and planned teaching schedule</p>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 60vh; overflow-y: auto;">
-            ${topics.map(t => `
-              <div style="background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                  <div style="font-size: 0.85rem; font-weight: 700; color: #fff;">
-                    ${t.status === 'COMPLETED' ? '✅' : t.status === 'IN_PROGRESS' ? '⏳' : '⚪'} 
-                    Unit ${t.unit_number}: ${t.topic_title}
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.15rem;">
-                    Planned Date: <strong>${t.planned_date || 'TBD'}</strong> • Scope: ${t.exam_scope}
-                  </div>
-                </div>
-                <div style="text-align: right;">
-                  <span class="badge-status ${t.status.replace(' ', '_')}" style="font-size: 0.7rem;">${t.status}</span>
-                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">${t.planned_hours} hrs</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `;
-      } catch (err) {
-        body.innerHTML = `<div style="color: var(--accent-rose);">Error: ${err.message}</div>`;
-      }
-    },
-
-    // -------------------------------------------------------------
-    // TAB 5: CALENDAR & TIMETABLE
-    // -------------------------------------------------------------
-    async loadCalendarAndTimetable() {
-      const container = document.getElementById('timetableContainer');
-      if (!container) return;
-
-      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading timetable and academic calendar rules...</div>';
-
-      try {
-        const tData = await API.getTimetable(this.activeFilters);
-        const slots = tData.slots || [];
-
-        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        container.innerHTML = `
-          <div class="glass-card" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff;">Weekly Master Timetable</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted);">Configured working Saturday rule: <strong>SECOND_AND_FOURTH</strong> (2nd & 4th Sat working, others off)</p>
             </div>
-            <div>
-              <button class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem 1rem;" onclick="App.openAddHolidayModal()">
-                ➕ Add Campus Holiday / Event
+
+            <div class="progress-bar-track" style="margin-bottom: 1.25rem;">
+              <div class="progress-bar-fill" style="width: ${s.progressPercentage}%;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--borders-subtle); padding-top: 0.85rem;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">${formatDuration(s.remainingHours)} remaining to final target</span>
+              <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;" onclick="App.showStudentTopicBreakdown('${s.id}')">
+                📖 View Completed & Upcoming Topics
               </button>
             </div>
           </div>
-
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-            ${weekdays.map((dayName, idx) => {
-              const dow = idx + 1;
-              const daySlots = slots.filter(s => s.weekday === dow);
-
-              return `
-                <div class="glass-card" style="padding: 1rem;">
-                  <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--accent-cyan); display: flex; justify-content: space-between;">
-                    <span>${dayName}</span>
-                    <span style="font-size: 0.75rem; color: var(--text-dim);">${daySlots.length} slot(s)</span>
-                  </div>
-
-                  ${daySlots.length === 0 ? `
-                    <div style="font-size: 0.75rem; color: var(--text-dim); text-align: center; padding: 1rem;">No slots scheduled</div>
-                  ` : `
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                      ${daySlots.map(s => `
-                        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); padding: 0.6rem; font-size: 0.8rem;">
-                          <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                            <span style="color: #fff;">${s.subject_code}</span>
-                            <span style="color: var(--accent-indigo); font-family: 'JetBrains Mono';">${s.duration_hours} hrs</span>
-                          </div>
-                          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">${s.start_time} - ${s.end_time} • ${s.faculty_name}</div>
-                          <div style="font-size: 0.7rem; color: var(--text-dim);">${s.batch_name}</div>
-                        </div>
-                      `).join('')}
-                    </div>
-                  `}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `;
+        `).join('');
       } catch (err) {
-        container.innerHTML = `<div style="color: var(--accent-rose); padding: 1.5rem;">Error: ${err.message}</div>`;
-      }
-    },
-
-    openAddHolidayModal() {
-      const modal = document.getElementById('addHolidayModal');
-      if (modal) modal.classList.add('active');
-    },
-
-    async submitAddHoliday() {
-      const semId = this.activeFilters.semester_id || 'sem_hitech_mirai_a';
-      const eventDate = document.getElementById('holidayDateInput').value;
-      const title = document.getElementById('holidayTitleInput').value;
-      const eventType = document.getElementById('holidayTypeSelect').value;
-
-      if (!eventDate || !title) {
-        this.showToast('Please enter both event date and title', 'warning');
-        return;
-      }
-
-      try {
-        await API.addCalendarEvent(semId, {
-          event_date: eventDate,
-          title,
-          event_type: eventType,
-          affects_schedule: 1
-        });
-        this.closeModal('addHolidayModal');
-        this.showToast('Holiday added! Affected syllabus dates recalculated.', 'success');
-        await this.loadCalendarAndTimetable();
-      } catch (err) {
-        this.showToast(`Error adding holiday: ${err.message}`, 'error');
+        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
       }
     },
 
     // -------------------------------------------------------------
-    // TAB 6: MISSED-SESSION ALERTS
+    // TAB 10: EXAM READINESS HUB (Student)
     // -------------------------------------------------------------
-    async loadAlertsView() {
-      const container = document.getElementById('alertsListContainer');
+    async loadExamReadiness() {
+      const container = document.getElementById('examWindowsContainer') || document.getElementById('examCardsContainer');
       if (!container) return;
 
-      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Scanning academic reminders and escalations...</div>';
+      container.innerHTML = '<div style="text-align:center; padding: 2rem;">Evaluating exam readiness models...</div>';
+
+      try {
+        const data = await API.getExamReadiness();
+        const exams = data.examWindows || [];
+
+        if (exams.length === 0) {
+          container.innerHTML = '<div class="content-card" style="text-align: center; padding: 2rem;">No active exam windows found.</div>';
+          return;
+        }
+
+        container.innerHTML = exams.map(e => `
+          <div class="content-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+              <div>
+                <span class="status-pill tight">${e.exam_type.replace('_', ' ')}</span>
+                <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-top: 0.35rem;">${e.name}</h3>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">${e.start_date} to ${e.end_date}</div>
+              </div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 800; color: var(--primary-blue);">
+                ${e.coveragePercent}%
+              </div>
+            </div>
+
+            <div class="progress-bar-track" style="margin-bottom: 1rem;">
+              <div class="progress-bar-fill" style="width: ${e.coveragePercent}%;"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background-color: var(--surface-soft); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.82rem;">
+              <div>
+                <span style="color: var(--text-secondary);">In-Scope:</span>
+                <strong style="color: var(--heading-deep-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(e.inScopeHours)}</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">Covered:</span>
+                <strong style="color: #10B981; font-family: 'JetBrains Mono', monospace;">${formatDuration(e.coveredHours)}</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">Remaining:</span>
+                <strong style="color: #F59E0B; font-family: 'JetBrains Mono', monospace;">${formatDuration(e.remainingHours)}</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">Available:</span>
+                <strong style="color: var(--primary-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(e.availableHoursBeforeExam)}</strong>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 5: ALERTS & ESCALATIONS
+    // -------------------------------------------------------------
+    async loadAlertsView() {
+      const container = document.getElementById('alertsContainer');
+      if (!container) return;
+
+      container.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading alerts...</div>';
 
       try {
         const data = await API.getAlerts();
         const alerts = data.alerts || [];
 
-        const simDateDisplay = document.getElementById('simDateControllerDisplay');
-        if (simDateDisplay) simDateDisplay.textContent = data.activeSimulationDate;
-
         if (alerts.length === 0) {
-          container.innerHTML = `
-            <div class="glass-card" style="text-align: center; padding: 2.5rem;">
-              <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎉</div>
-              <h4 style="font-size: 1.1rem; font-weight: 800; color: #fff;">All Sessions Logged Up to Date</h4>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
-                No unlogged teaching sessions detected as of <strong>${data.activeSimulationDate}</strong>.
-              </p>
-              <p style="font-size: 0.8rem; color: var(--accent-cyan); margin-top: 0.5rem;">
-                Tip: Click "Advance 2 Days" above to simulate time progression and test escalation alerts!
-              </p>
-            </div>
-          `;
+          container.innerHTML = '<div class="content-card" style="text-align: center; padding: 2.5rem; color: #10B981; font-weight: 600;">✅ All clear! No missed-session reminders or escalations.</div>';
           return;
         }
 
-        container.innerHTML = alerts.map(a => {
-          const isDanger = a.severity === 'DANGER';
-          return `
-            <div class="glass-card" style="margin-bottom: 0.75rem; border-left: 4px solid ${isDanger ? 'var(--accent-rose)' : 'var(--accent-amber)'}; opacity: ${a.is_read ? '0.6' : '1'};">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                    <span class="banner-badge ${isDanger ? 'badge-danger' : 'badge-tight'}" style="font-size: 0.65rem; padding: 0.2rem 0.5rem;">
-                      ${a.alert_type}
-                    </span>
-                    <span style="font-size: 0.75rem; color: var(--text-dim);">${a.created_at}</span>
-                  </div>
-                  <div style="font-size: 0.9rem; color: #fff; font-weight: 600; margin-top: 0.25rem;">
-                    ${a.message}
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                    Recipient Role: <strong>${a.recipient_role}</strong> • Campus: ${a.campus_name || 'All'}
-                  </div>
-                </div>
-                ${!a.is_read ? `
-                  <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;" onclick="App.markAlertRead('${a.id}')">
-                    Mark Read
-                  </button>
-                ` : '<span style="font-size: 0.75rem; color: var(--text-dim);">Read</span>'}
+        container.innerHTML = alerts.map(a => `
+          <div class="content-card" style="border-left: 5px solid ${a.severity === 'DANGER' ? '#EF4444' : '#F59E0B'}; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <span class="status-pill ${a.severity === 'DANGER' ? 'danger' : 'tight'}">${a.alert_type.replace(/_/g, ' ')}</span>
+                <span style="font-size: 0.78rem; color: var(--text-muted);">${a.created_at}</span>
               </div>
+              <div style="font-weight: 700; color: var(--heading-deep-blue); font-size: 0.95rem;">${a.message}</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem;">Session Date: ${a.session_date}</div>
             </div>
-          `;
-        }).join('');
+            <div>
+              <button type="button" class="btn-secondary" style="font-size: 0.78rem;" onclick="App.markAlertRead('${a.id}')">
+                ✓ Dismiss
+              </button>
+            </div>
+          </div>
+        `).join('');
       } catch (err) {
-        container.innerHTML = `<div style="color: var(--accent-rose); padding: 1.5rem;">Error: ${err.message}</div>`;
+        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
       }
     },
 
     async markAlertRead(alertId) {
-      await API.markAlertRead(alertId);
-      await this.loadAlertsView();
-      await this.checkAlertsBadge();
+      try {
+        await API.markAlertRead(alertId);
+        this.showToast('Alert dismissed', 'info');
+        await this.loadAlertsView();
+        this.checkAlertsBadge();
+      } catch (err) {
+        this.showToast(`Error: ${err.message}`, 'error');
+      }
     },
 
     // -------------------------------------------------------------
-    // TAB 7: CSV IMPORT / EXPORT
+    // TAB 6: CSV IMPORTS
     // -------------------------------------------------------------
-    async loadImportsView() {
-      // Setup default view
-    },
+    async handleCsvUpload(type) {
+      const input = document.getElementById(type === 'syllabus' ? 'csvFileInputSyllabus' : 'csvFileInputTimetable');
+      if (!input || !input.files || !input.files[0]) {
+        this.showToast('Please select a CSV file first.', 'warning');
+        return;
+      }
 
-    async handleCSVUpload(type, inputElement) {
-      const file = inputElement.files[0];
-      if (!file) return;
-
+      const file = input.files[0];
       const formData = new FormData();
       formData.append('file', file);
 
       try {
         const res = await API.importCSV(type, formData);
-        this.showToast(res.message, 'success');
-        inputElement.value = '';
+        this.showToast(res.message || 'CSV imported successfully!', 'success');
+        input.value = '';
+        await this.loadInitialMetadata();
       } catch (err) {
-        this.showToast(`Import Error: ${err.message}`, 'error');
+        this.showToast(`Import error: ${err.message}`, 'error');
       }
     },
 
-    // Utilities
+    // -------------------------------------------------------------
+    // UTILITY: TOASTS
+    // -------------------------------------------------------------
     showToast(message, type = 'info') {
       const container = document.getElementById('toastContainer');
       if (!container) return;
 
       const toast = document.createElement('div');
-      toast.className = `toast ${type}`;
-      toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span><span>${message}</span>`;
+      toast.className = 'toast';
+      const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : type === 'error' ? '❌' : 'ℹ️';
+      toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
       container.appendChild(toast);
 
       setTimeout(() => {
         toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-      }, 4000);
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'all 200ms ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
     }
   };
 
   window.App = App;
-  await App.init();
+  App.init();
 });

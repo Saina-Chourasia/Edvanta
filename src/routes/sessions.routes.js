@@ -47,8 +47,12 @@ router.get('/today', authenticate, (req, res) => {
   const todaySessions = slots.map(slot => {
     const existingLog = db.get(`
       SELECT * FROM teaching_sessions
-      WHERE session_date = ? AND (timetable_slot_id = ? OR subject_id = ?)
-    `, [activeDate, slot.id, slot.subject_id]);
+      WHERE session_date = ? AND (
+        timetable_slot_id = ?
+        OR (timetable_slot_id IS NULL AND subject_id = ? AND batch_name = ? AND campus_id = ?)
+      )
+      LIMIT 1
+    `, [activeDate, slot.id, slot.subject_id, slot.batch_name, slot.campus_id]);
 
     // Next upcoming topic in syllabus
     const nextTopic = db.get(`
@@ -96,8 +100,14 @@ router.get('/history', authenticate, (req, res) => {
   if (start_date) { sql += ` AND sess.session_date >= ?`; params.push(start_date); }
   if (end_date) { sql += ` AND sess.session_date <= ?`; params.push(end_date); }
 
-  // Student role restriction
-  if (req.user.role === 'STUDENT' && req.user.batch_name) {
+  // Role-based boundary restrictions
+  if (req.user.role === 'FACULTY') {
+    sql += ` AND sess.faculty_id = ?`;
+    params.push(req.user.id);
+  } else if (req.user.role === 'CAMPUS_MANAGER') {
+    sql += ` AND sess.campus_id = ?`;
+    params.push(req.user.campus_id);
+  } else if (req.user.role === 'STUDENT' && req.user.batch_name) {
     sql += ` AND sess.batch_name = ?`;
     params.push(req.user.batch_name);
   }
