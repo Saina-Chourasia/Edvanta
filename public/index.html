@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDVANTA — Course Progression Tracker</title>
+  <meta name="description" content="EDVANTA: Real-time course progression tracker, syllabus delivery analytics, and exam readiness for MSOT. Every Hour Counts, Every Goal Matters.">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- Top Sticky Header -->
+  <header class="top-header">
+    <div class="top-bar-container">
+      <a href="#" class="brand-section" onclick="App.switchTab('dashboard')">
+        <div class="brand-icon">E</div>
+        <div class="brand-info">
+          <h1>EDVANTA <span style="font-size: 0.65rem; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); padding: 0.15rem 0.4rem; border-radius: 4px; color: #a5b4fc;">MSOT</span></h1>
+          <p>Every Hour Counts, Every Goal Matters.</p>
+        </div>
+      </a>
+
+      <div class="header-controls">
+        <!-- Active Simulation Date Indicator & Controls -->
+        <div class="sim-date-pill" title="Current simulated system time for calculations and alerts">
+          <span>🕒</span>
+          <span id="activeSimDateDisplay">2026-10-19</span>
+          <button id="btnAdvance2Days" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.65rem; border-radius: 4px; margin-left: 0.25rem;" title="Simulate time progression to test unlogged session alerts">
+            +2 Days
+          </button>
+          <button id="btnResetSim" class="btn-secondary" style="padding: 0.15rem 0.35rem; font-size: 0.65rem; border-radius: 4px;" title="Reset back to system clock">
+            ↺
+          </button>
+        </div>
+
+        <!-- 1-Click Role Switcher -->
+        <div class="role-badge-selector">
+          <span style="font-size: 0.75rem; margin-right: 0.2rem;">👤 Role:</span>
+          <select id="roleSwitcherSelect" title="Switch user role instantly for hackathon evaluation">
+            <option value="usr_admin">👑 Dean (Admin)</option>
+            <option value="usr_mgr_hitech">🏢 HI-Tech Campus Mgr</option>
+            <option value="usr_fac_thorne">👨‍🏫 Dr. Thorne (Faculty - CS)</option>
+            <option value="usr_fac_math">👨‍🏫 Dr. Ramanujan (Faculty - Math)</option>
+            <option value="usr_stu_aarav">🎓 Aarav (Student - Mirai)</option>
+          </select>
+        </div>
+
+        <!-- Notification Bell Icon -->
+        <button class="btn-icon" title="Missed Session Alerts & Escalations" onclick="App.switchTab('alerts')">
+          🔔
+          <span id="alertsBadge" class="badge-counter" style="display: none;">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs Bar -->
+  <nav class="nav-tabs-bar">
+    <div class="nav-tabs-container">
+      <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="nav-tab" data-tab="logger">⚡ Fast Session Logger (<60s)</button>
+      <button class="nav-tab" data-tab="exams">🎯 Exam Readiness</button>
+      <button class="nav-tab" data-tab="student">🎓 Student View</button>
+      <button class="nav-tab" data-tab="calendar">📅 Timetable & Calendar</button>
+      <button class="nav-tab" data-tab="alerts">🚨 Alerts & Escalations</button>
+      <button class="nav-tab" data-tab="imports">📁 CSV Import & Export</button>
+    </div>
+  </nav>
+
+  <!-- Main Application Body -->
+  <main class="main-wrapper">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
+    <!-- ========================================== -->
+    <section id="view-dashboard" class="tab-view-content">
+      
+      <!-- Rolled-up Track Status Warning Banner (Requirement 10.I) -->
+      <div id="rolledUpBanner" class="track-status-banner DANGER">
+        <div class="banner-left">
+          <span id="bannerBadge" class="banner-badge badge-danger">DANGER</span>
+          <div>
+            <div id="bannerTitle" class="banner-title">Loading Track Progression Status...</div>
+            <div id="bannerDesc" class="banner-desc">Analyzing planned vs delivered curriculum across 4 campuses...</div>
+          </div>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-dim); text-align: right;">
+          Worst-case Rolled-up Model<br>
+          <span style="color: var(--accent-cyan); font-weight: 700;">Zero Masking Rule</span>
+        </div>
+      </div>
+
+      <!-- Filters Bar -->
+      <div class="filters-bar">
+        <div class="filter-group">
+          <label for="campusFilter">Campus:</label>
+          <select id="campusFilter" class="filter-select">
+            <option value="">All Campuses (4)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="trackFilter">Academic Track:</label>
+          <select id="trackFilter" class="filter-select">
+            <option value="">All Tracks</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="semesterFilter">Semester / Batch:</label>
+          <select id="semesterFilter" class="filter-select">
+            <option value="">All Active Semesters</option>
+          </select>
+        </div>
+
+        <div style="margin-left: auto;">
+          <a href="/api/exports/export/progress-report" target="_blank" class="btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+            📥 Export Report (CSV)
+          </a>
+        </div>
+      </div>
+
+      <!-- Key Performance Indicators (KPIs) -->
+      <div class="kpi-grid">
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Total Subjects</span>
+            <span>📚</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalSubjects">0</div>
+          <div class="kpi-subtext">Active curriculum items</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>On Track (>=1.15)</span>
+            <span style="color: var(--accent-emerald);">🟢</span>
+          </div>
+          <div class="kpi-value" id="kpiOnTrack" style="color: var(--accent-emerald);">0</div>
+          <div class="kpi-subtext">Healthy progression buffer</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Tight (1.00-1.15)</span>
+            <span style="color: var(--accent-amber);">🟡</span>
+          </div>
+          <div class="kpi-value" id="kpiTight" style="color: var(--accent-amber);">0</div>
+          <div class="kpi-subtext">Minimal safety margin</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Danger (<1.00)</span>
+            <span style="color: var(--accent-rose);">🔴</span>
+          </div>
+          <div class="kpi-value" id="kpiDanger" style="color: var(--accent-rose);">0</div>
+          <div class="kpi-subtext">Early warning triggered</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Hours Coverage %</span>
+            <span>📊</span>
+          </div>
+          <div class="kpi-value" id="kpiCoveragePercent">0%</div>
+          <div class="kpi-subtext">Hour-weighted delivery</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Aggregate Buffer</span>
+            <span>⏱️</span>
+          </div>
+          <div class="kpi-value" id="kpiBufferRatio">0.00</div>
+          <div class="kpi-subtext">Available / Remaining</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Pace vs Plan</span>
+            <span>📈</span>
+          </div>
+          <div class="kpi-value" id="kpiPaceVsPlan">0.0 hrs</div>
+          <div class="kpi-subtext">Covered vs Expected by Today</div>
+        </div>
+
+        <div class="glass-card kpi-card">
+          <div class="kpi-header">
+            <span>Overdue Topics</span>
+            <span>⚠️</span>
+          </div>
+          <div class="kpi-value" id="kpiOverdueTopics">0</div>
+          <div class="kpi-subtext">Planned date has passed</div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-grid">
+        <div class="glass-card">
+          <div class="chart-card-title">
+            <span>Course Hours Delivery Breakdown</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: normal;">Planned vs Delivered vs Available</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartHoursOverview"></canvas>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="chart-card-title">
+            <span>Health Distribution</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: normal;">Track Status</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartStatusBreakdown"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subjects Progression Table -->
+      <div class="glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff;">Subject Syllabus Progression & Buffer Analysis</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">Click "Trace" on any subject to inspect exact formulas and calendar calculations.</p>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Campus / Batch</th>
+                <th>In Scope</th>
+                <th>Covered</th>
+                <th>Remaining</th>
+                <th>Available</th>
+                <th>Buffer Ratio</th>
+                <th>Coverage %</th>
+                <th>Pace vs Plan</th>
+                <th>Status & Trace</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardSubjectsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: DAILY FACULTY SESSION LOGGER        -->
+    <!-- ========================================== -->
+    <section id="view-logger" class="tab-view-content" style="display: none;">
+      <div class="logger-card">
+        <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-cyan);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Daily Session Logger</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Ultra-fast mobile flow: Log your teaching session in under 60 seconds with pre-filled timetable & syllabus sequence.
+              </p>
+            </div>
+            <div id="loggerDateDisplay" style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--accent-cyan); font-size: 0.9rem;">
+              Today
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's Scheduled Classes List -->
+        <div id="todaySessionsList">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: EXAM READINESS HUB                  -->
+    <!-- ========================================== -->
+    <section id="view-exams" class="tab-view-content" style="display: none;">
+      <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-indigo);">
+        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Examination Readiness Assessment</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+          Tracks syllabus completion strictly within examination scope. Topics outside the exam scope do not affect readiness ratings.
+        </p>
+      </div>
+
+      <div id="examCardsContainer" class="exam-cards-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: STUDENT VIEW (Read-Only)            -->
+    <!-- ========================================== -->
+    <section id="view-student" class="tab-view-content" style="display: none;">
+      <div id="studentPortalContent">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 5: TIMETABLE & ACADEMIC CALENDAR       -->
+    <!-- ========================================== -->
+    <section id="view-calendar" class="tab-view-content" style="display: none;">
+      <div id="timetableContainer">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 6: MISSED-SESSION ALERTS               -->
+    <!-- ========================================== -->
+    <section id="view-alerts" class="tab-view-content" style="display: none;">
+      <div class="glass-card" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">Missed-Session Alert & Escalation Center</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+            Faculty receives reminder at end of scheduled day. If unlogged after 48 hours, alert escalates automatically to the Campus Manager.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 0.8rem; color: var(--text-dim);">Simulated Time:</span>
+          <span id="simDateControllerDisplay" style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--accent-cyan); font-size: 0.85rem;">2026-10-19</span>
+        </div>
+      </div>
+
+      <div id="alertsListContainer">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 7: CSV IMPORT / EXPORT                 -->
+    <!-- ========================================== -->
+    <section id="view-imports" class="tab-view-content" style="display: none;">
+      <div class="glass-card" style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">CSV Import & Export Engine</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+          Atomic database transactions with strict row validation. Invalid records are rejected and will not corrupt the database.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+        <!-- 1. Calendar Import -->
+        <div class="glass-card">
+          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">📅 Academic Calendar & Holidays</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Import campus holidays, sessional dates, and academic events. Automatically recalculates syllabus dates.
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/exports/export/template/calendar" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
+              ⬇️ Sample Template
+            </a>
+          </div>
+          <div class="form-group">
+            <input type="file" id="csvCalendarFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('calendar', this)">
+          </div>
+        </div>
+
+        <!-- 2. Timetable Import -->
+        <div class="glass-card">
+          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">⏰ Timetable Slots</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Import weekly batch schedules. Automatically computes exact decimal teaching hours (e.g. 50 mins = 0.83 hrs).
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/exports/export/template/timetable" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
+              ⬇️ Sample Template
+            </a>
+          </div>
+          <div class="form-group">
+            <input type="file" id="csvTimetableFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('timetable', this)">
+          </div>
+        </div>
+
+        <!-- 3. Syllabus Import -->
+        <div class="glass-card">
+          <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">📚 Syllabus & Lesson Plans</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Import units, topics, planned teaching hours, and examination scopes.
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/exports/export/template/syllabus" class="btn-secondary" style="font-size: 0.75rem; flex: 1; justify-content: center;">
+              ⬇️ Sample Template
+            </a>
+          </div>
+          <div class="form-group">
+            <input type="file" id="csvSyllabusFile" accept=".csv" class="form-input" onchange="App.handleCSVUpload('syllabus', this)">
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: FAST SESSION LOGGER (<60s)          -->
+  <!-- ========================================== -->
+  <div id="sessionLoggerModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">⚡ Log Teaching Session</div>
+          <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">Mobile Fast Flow</div>
+        </div>
+        <button class="btn-close" onclick="App.closeModal('sessionLoggerModal')">&times;</button>
+      </div>
+
+      <!-- Usability Stopwatch Banner -->
+      <div class="stopwatch-widget">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">⏱️ Flow Stopwatch:</span>
+          <span style="font-size: 0.75rem; color: var(--text-dim); margin-left: 0.25rem;">Target < 60s</span>
+        </div>
+        <div id="loggerStopwatchTimer" class="stopwatch-time">00:00</div>
+      </div>
+
+      <div id="logModalHeaderInfo" style="margin-bottom: 1rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-glass);">
+        <!-- Populated dynamically -->
+      </div>
+
+      <input type="hidden" id="logModalSlotId">
+      <input type="hidden" id="logModalSubjectId">
+      <input type="hidden" id="logModalDate">
+      <input type="hidden" id="logModalDuration">
+      <input type="hidden" id="logModalTopicId">
+      <input type="hidden" id="logModalStatusInput" value="COMPLETED">
+      <input type="hidden" id="logModalPctInput" value="100">
+
+      <!-- Status Selection Chips -->
+      <div class="form-group">
+        <label class="form-label">Session Status (Tap to select):</label>
+        <div class="status-chips-group">
+          <button type="button" class="status-chip selected" data-status="COMPLETED" onclick="App.selectStatusChip('COMPLETED')">
+            ✅ COMPLETED
+          </button>
+          <button type="button" class="status-chip" data-status="IN_PROGRESS" onclick="App.selectStatusChip('IN_PROGRESS')">
+            ⏳ IN PROGRESS
+          </button>
+          <button type="button" class="status-chip" data-status="SKIPPED" onclick="App.selectStatusChip('SKIPPED')">
+            ⏭️ SKIPPED
+          </button>
+          <button type="button" class="status-chip" data-status="MERGED" onclick="App.selectStatusChip('MERGED')">
+            🔗 MERGED
+          </button>
+          <button type="button" class="status-chip" data-status="CANCELLED" onclick="App.selectStatusChip('CANCELLED')">
+            ❌ CANCELLED
+          </button>
+        </div>
+      </div>
+
+      <!-- % Complete Section (for IN_PROGRESS) -->
+      <div id="logModalPctSection" class="form-group" style="display: none;">
+        <label class="form-label">Topic Coverage Percentage:</label>
+        <div class="pct-pills-group">
+          <button type="button" class="pct-pill" data-pct="25" onclick="App.selectPctPill(25)">25%</button>
+          <button type="button" class="pct-pill" data-pct="50" onclick="App.selectPctPill(50)">50%</button>
+          <button type="button" class="pct-pill" data-pct="75" onclick="App.selectPctPill(75)">75%</button>
+          <button type="button" class="pct-pill active" data-pct="100" onclick="App.selectPctPill(100)">100%</button>
+        </div>
+      </div>
+
+      <!-- Topics Covered -->
+      <div class="form-group">
+        <label class="form-label">Topic Covered / Taught:</label>
+        <input type="text" id="logModalTopicInput" class="form-input" placeholder="e.g. Distributed Consensus Algorithms">
+      </div>
+
+      <!-- Carry-Forward Section -->
+      <div id="logModalCarrySection" class="form-group" style="display: none;">
+        <label class="form-label">Carry-Forward Remaining Topic (Next class):</label>
+        <input type="text" id="logModalCarryForwardInput" class="form-input" placeholder="e.g. Raft Log Replication remaining 50%">
+      </div>
+
+      <!-- Classwork & Homework -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label class="form-label">Classwork Status:</label>
+          <input type="text" id="logModalClassworkInput" class="form-input" placeholder="e.g. Lab exercise 3 completed">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Homework Status:</label>
+          <input type="text" id="logModalHomeworkInput" class="form-input" placeholder="e.g. Assignment 2 assigned">
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-group">
+        <label class="form-label">Teaching Notes / Observations (Optional):</label>
+        <textarea id="logModalNotesInput" class="form-textarea" rows="2" placeholder="Student comprehension, lab attendance, etc."></textarea>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" class="btn-secondary" style="flex: 1; justify-content: center;" onclick="App.closeModal('sessionLoggerModal')">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" style="flex: 2; justify-content: center;" onclick="App.submitSessionLog()">
+          💾 Save & Log Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: TRACEABILITY INSPECTOR              -->
+  <!-- ========================================== -->
+  <div id="traceabilityModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">🔍 Metric Calculation Traceability</div>
+        <button class="btn-close" onclick="App.closeModal('traceabilityModal')">&times;</button>
+      </div>
+      <div id="traceabilityModalBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: STUDENT TOPICS BREAKDOWN            -->
+  <!-- ========================================== -->
+  <div id="studentTopicsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📖 Curriculum Syllabus</div>
+        <button class="btn-close" onclick="App.closeModal('studentTopicsModal')">&times;</button>
+      </div>
+      <div id="studentTopicsModalBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD CAMPUS HOLIDAY                  -->
+  <!-- ========================================== -->
+  <div id="addHolidayModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">📅 Add Campus Holiday / Event</div>
+        <button class="btn-close" onclick="App.closeModal('addHolidayModal')">&times;</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Note: Adding a holiday will immediately recalculate future planned topic dates across affected subjects.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Event Date:</label>
+        <input type="date" id="holidayDateInput" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Event Title:</label>
+        <input type="text" id="holidayTitleInput" class="form-input" placeholder="e.g. Founder's Day Holiday">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Event Type:</label>
+        <select id="holidayTypeSelect" class="form-select">
+          <option value="HOLIDAY">HOLIDAY (Cancels classes & shifts topics)</option>
+          <option value="ACADEMIC_EVENT">ACADEMIC EVENT (Non-cancelling)</option>
+          <option value="EXAM_DAY">EXAM DAY</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" class="btn-secondary" style="flex: 1; justify-content: center;" onclick="App.closeModal('addHolidayModal')">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" style="flex: 2; justify-content: center;" onclick="App.submitAddHoliday()">
+          Confirm & Recalculate Timeline
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- App Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
