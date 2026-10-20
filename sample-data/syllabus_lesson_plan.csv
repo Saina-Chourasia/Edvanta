@@ -1,0 +1,9 @@
+subject_code,unit_number,unit_name,topic_title,description,planned_hours,sequence_order,exam_scope
+CS301,1,Cloud Computing Foundations,Virtual Machines & Hypervisors,Type-1 vs Type-2 hypervisors,2.0,1,SESSIONAL
+CS301,1,Cloud Computing Foundations,Containers and Orchestration,Docker fundamentals and architecture,2.0,2,SESSIONAL
+CS301,2,Cloud Storage & Networking,Object vs Block Storage,S3 and EBS models,2.0,3,MID_TERM
+CS301,2,Cloud Storage & Networking,VPC and Subnets,Public and private routing,2.0,4,MID_TERM
+CS301,3,Serverless and Microservices,FaaS Architecture,Lambda execution lifecycle,2.5,5,PUT
+CS301,3,Serverless and Microservices,API Gateway & Microservices,Event-driven system design,2.5,6,PUT
+CS301,4,Cloud Security & Governance,IAM & Identity Federation,Roles policies and zero trust,2.0,7,END_TERM
+CS301,4,Cloud Security & Governance,Compliance & Encryption,KMS TLS and data governance,2.0,8,END_TERM

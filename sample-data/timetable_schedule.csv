@@ -1,0 +1,7 @@
+campus_id,track_id,semester_id,batch_name,subject_code,faculty_email,weekday,start_time,end_time,room
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,CS301,faculty.cs@edvanta.msot.edu,1,09:00,09:50,Lab-A1
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,MA202,faculty.math@edvanta.msot.edu,1,10:00,10:50,LH-201
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,CS301,faculty.cs@edvanta.msot.edu,2,09:00,09:50,Lab-A1
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,MA202,faculty.math@edvanta.msot.edu,3,11:00,11:50,LH-201
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,CS301,faculty.cs@edvanta.msot.edu,4,14:00,14:50,Lab-A1
+camp_hitech,track_mirai,sem_hitech_mirai_a,Batch-2026-Mirai-A,MA202,faculty.math@edvanta.msot.edu,5,10:00,10:50,LH-201

@@ -1,0 +1,5 @@
+semester_id,campus_id,event_date,event_type,title,description,affects_schedule
+sem_hitech_mirai_a,camp_hitech,2026-11-26,HOLIDAY,Constitution Day,National Holiday,1
+sem_hitech_mirai_a,camp_hitech,2026-12-25,HOLIDAY,Christmas Day,Public Holiday,1
+sem_hitech_mirai_a,camp_hitech,2027-01-01,HOLIDAY,New Year Day,Institute Holiday,1
+sem_hitech_mirai_a,camp_hitech,2027-01-26,HOLIDAY,Republic Day,National Holiday,1
