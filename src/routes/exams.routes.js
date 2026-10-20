@@ -35,7 +35,8 @@ router.get('/readiness', authenticate, (req, res) => {
     res.json({
       semesterId: targetSemesterId,
       asOfDate: ProgressionService.getToday(as_of_date),
-      exams
+      exams,
+      examWindows: exams
     });
   } catch (err) {
     console.error('Exam readiness error:', err);

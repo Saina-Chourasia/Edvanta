@@ -155,6 +155,31 @@ const API = {
     return this.request(`/api/dashboard/overview${query ? '?' + query : ''}`);
   },
 
+  // Student Portal Progression (Requirement 5 & 13)
+  async getStudentProgress() {
+    const user = this.getCurrentUser();
+    const batchName = (user && user.batch_name) ? user.batch_name : '';
+    const res = await this.getDashboard({ batch_name: batchName });
+    const subjects = (res.subjects || []).map(s => ({
+      id: s.id || s.subjectId,
+      subjectId: s.subjectId || s.id,
+      code: s.code,
+      name: s.name,
+      faculty_name: s.faculty_name || s.facultyName || 'Assigned Faculty',
+      progressPercentage: s.coveragePercent !== undefined ? s.coveragePercent : (s.progressPercentage || 0),
+      coveragePercent: s.coveragePercent !== undefined ? s.coveragePercent : (s.progressPercentage || 0),
+      coveredHours: s.coveredHours || 0,
+      total_hours: s.hoursInScope !== undefined ? s.hoursInScope : (s.total_hours || 0),
+      hoursInScope: s.hoursInScope !== undefined ? s.hoursInScope : (s.total_hours || 0),
+      remainingHours: s.remainingHours || 0,
+      availableHours: s.availableHours || 0,
+      bufferRatio: s.bufferRatio || 0,
+      status: s.status || 'ON TRACK',
+      overdueTopicsCount: s.overdueTopicsCount || 0
+    }));
+    return { ...res, subjects };
+  },
+
   // Sessions
   async getTodaySessions(date = null) {
     const query = date ? `?date=${date}` : '';

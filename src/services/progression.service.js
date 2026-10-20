@@ -163,11 +163,13 @@ export class ProgressionService {
     const subject = db.get(`
       SELECT s.*, sem.start_date as semester_start, sem.end_date as semester_end,
              sem.working_saturday_rule, sem.target_finish_date,
-             c.name as campus_name, t.name as track_name, sem.batch_name
+             c.name as campus_name, t.name as track_name, sem.batch_name,
+             u.name as faculty_name
       FROM subjects s
       JOIN semesters sem ON s.semester_id = sem.id
       JOIN campuses c ON s.campus_id = c.id
       JOIN tracks t ON s.track_id = t.id
+      LEFT JOIN users u ON s.faculty_id = u.id
       WHERE s.id = ?
     `, [subjectId]);
 
@@ -312,9 +314,11 @@ export class ProgressionService {
     const paceVsPlan = coveredHours - hoursThatShouldHaveBeenCoveredByToday;
 
     return {
+      id: subject.id,
       subjectId: subject.id,
       code: subject.code,
       name: subject.name,
+      faculty_name: subject.faculty_name || 'Assigned Faculty',
       campusId: subject.campus_id,
       campusName: subject.campus_name,
       trackId: subject.track_id,
@@ -326,9 +330,11 @@ export class ProgressionService {
 
       // Core calculation outputs
       hoursInScope: Number(hoursInScope.toFixed(4)),
+      total_hours: Number(hoursInScope.toFixed(4)),
       coveredHours: Number(coveredHours.toFixed(4)),
       remainingHours: Number(remainingHours.toFixed(4)),
       coveragePercent: Number(coveragePercent.toFixed(2)),
+      progressPercentage: Number(coveragePercent.toFixed(2)),
       availableHours: Number(availableHours.toFixed(4)),
       bufferRatio: Number(bufferRatio.toFixed(2)),
       status, // 'COMPLETE', 'ON TRACK', 'TIGHT', 'DANGER'

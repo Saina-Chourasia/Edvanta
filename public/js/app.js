@@ -706,8 +706,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tbody = document.getElementById('attendanceTableBody');
       if (!tbody) return;
 
+      const attHeading = document.getElementById('attendanceTableHeading');
+      if (attHeading && this.user) {
+        attHeading.textContent = this.user.role === 'STUDENT' ? 'My Class Attendance Log' : 'Attendance Records Log';
+      }
+
       if (!records || records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No attendance records found.</td></tr>';
+        const isStudent = this.user && this.user.role === 'STUDENT';
+        const msg = isStudent
+          ? 'No attendance records logged yet for your profile. When your instructor initiates an attendance session, an active session card will appear at the top to record your presence.'
+          : 'No attendance records found for the selected campus or filters.';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-secondary); line-height: 1.5;">${msg}</td></tr>`;
         return;
       }
 
@@ -1390,21 +1399,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     // -------------------------------------------------------------
     // TAB 7: FAST SESSION LOGGER (<60s Flow for Faculty)
     // -------------------------------------------------------------
-    async loadTodayLogger() {
+    async loadTodayLogger(date = null) {
       const listContainer = document.getElementById('loggerTodaySlotsContainer') || document.getElementById('todaySessionsList');
       if (!listContainer) return;
 
       listContainer.innerHTML = '<div style="text-align:center; padding: 2rem;">Loading today\'s teaching schedule...</div>';
 
       try {
-        const data = await API.getTodaySessions();
+        const data = await API.getTodaySessions(date);
         this.todaySessionsData = data;
 
         if (!data.sessions || data.sessions.length === 0) {
           listContainer.innerHTML = `
             <div class="content-card" style="text-align:center; padding: 2.5rem;">
-              <p style="color: var(--text-secondary); font-size: 1rem;">No timetable sessions scheduled for ${data.dayName} (${data.activeDate}) for this profile.</p>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">Check your timetable slots or advance the simulation date.</p>
+              <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📅</div>
+              <h3 style="font-size: 1.25rem; color: var(--heading-deep-blue); margin-bottom: 0.35rem;">
+                No Timetable Sessions Scheduled for ${data.dayName} (${data.activeDate})
+              </h3>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 520px; margin: 0 auto 1.25rem auto;">
+                You do not have a scheduled class slot on this day. You can review your complete weekly schedule, inspect other days, or launch an instant logger session for any of your assigned subjects.
+              </p>
+              <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+                <button type="button" class="btn-primary" onclick="App.openInstantSubjectLogger()">
+                  ⚡ Quick Log Assigned Subject
+                </button>
+                <button type="button" class="btn-secondary" onclick="App.switchTab('calendar')">
+                  📅 View My Teaching Schedule
+                </button>
+              </div>
             </div>
           `;
           return;
@@ -1485,6 +1507,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.selectPctPill(100);
 
       if (modal) modal.style.display = 'flex';
+    },
+
+    async openInstantSubjectLogger() {
+      try {
+        const data = await API.getSubjects();
+        const subjects = data.subjects || [];
+        if (subjects.length === 0) {
+          this.showToast('No assigned subjects found for your profile.', 'warning');
+          return;
+        }
+
+        const modal = document.getElementById('sessionLoggerModal');
+        const s = subjects[0];
+
+        // Fetch next upcoming topic for this subject
+        const topicsData = await API.getSubjectTopics(s.id);
+        const topics = topicsData.topics || [];
+        const nextTopic = topics.find(t => t.status !== 'COMPLETED' && t.status !== 'SKIPPED') || topics[0];
+
+        document.getElementById('logModalSlotId').value = '';
+        document.getElementById('logModalSubjectId').value = s.id;
+        document.getElementById('logModalDate').value = this.todaySessionsData ? this.todaySessionsData.activeDate : new Date().toISOString().split('T')[0];
+        document.getElementById('logModalDuration').value = 1.0;
+        document.getElementById('logModalTopicId').value = nextTopic ? nextTopic.id : '';
+
+        document.getElementById('logModalHeaderInfo').innerHTML = `
+          <strong style="color: var(--heading-deep-blue); font-size: 1rem;">${s.code} - ${s.name}</strong><br>
+          <span style="font-size: 0.82rem; color: var(--text-secondary);">${s.batch_name || 'Assigned Class'} • Direct Session Log (1 hr)</span>
+        `;
+
+        if (nextTopic) {
+          document.getElementById('logModalTopicInput').value = nextTopic.topic_title;
+        } else {
+          document.getElementById('logModalTopicInput').value = '';
+        }
+
+        this.startStopwatch();
+        this.selectStatusChip('COMPLETED');
+        this.selectPctPill(100);
+
+        if (modal) modal.style.display = 'flex';
+      } catch (err) {
+        this.showToast('Error opening session logger: ' + err.message, 'error');
+      }
     },
 
     startStopwatch() {
@@ -1640,40 +1706,61 @@ document.addEventListener('DOMContentLoaded', async () => {
         const subjects = data.subjects || [];
 
         if (subjects.length === 0) {
-          container.innerHTML = '<div class="content-card" style="text-align:center; padding: 2rem;">No enrolled subjects found.</div>';
+          container.innerHTML = `
+            <div class="content-card" style="text-align:center; padding: 2.5rem;">
+              <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎓</div>
+              <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-bottom: 0.5rem;">No Enrolled Subjects Found</h3>
+              <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                No academic subjects are currently enrolled for your batch. Contact your academic administrator if this is unexpected.
+              </p>
+            </div>
+          `;
           return;
         }
 
-        container.innerHTML = subjects.map(s => `
-          <div class="content-card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
-              <div>
-                <span class="status-pill complete" style="margin-bottom: 0.25rem;">${s.code}</span>
-                <h3 style="font-size: 1.25rem; color: var(--heading-deep-blue); margin-top: 0.25rem;">${s.name}</h3>
-                <p style="font-size: 0.82rem; color: var(--text-secondary);">Faculty: <strong>${s.faculty_name}</strong></p>
-              </div>
-              <div style="text-align: right;">
-                <span class="status-pill ontrack">${s.progressPercentage}% Completed</span>
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-muted); margin-top: 0.35rem;">
-                  ${formatDuration(s.coveredHours)} / ${formatDuration(s.total_hours)}
+        container.innerHTML = subjects.map(s => {
+          const sId = s.id || s.subjectId;
+          const sCode = s.code || '';
+          const sName = s.name || '';
+          const sFaculty = s.faculty_name || s.facultyName || 'Assigned Faculty';
+          const sPct = s.progressPercentage !== undefined ? s.progressPercentage : (s.coveragePercent || 0);
+          const sCovered = s.coveredHours || 0;
+          const sTotal = s.total_hours !== undefined ? s.total_hours : (s.hoursInScope || 0);
+          const sRemaining = s.remainingHours !== undefined ? s.remainingHours : Math.max(0, sTotal - sCovered);
+          const sStatus = s.status || 'ON TRACK';
+          const statusClass = sStatus === 'COMPLETE' ? 'complete' : (sStatus === 'ON TRACK' ? 'ontrack' : (sStatus === 'TIGHT' ? 'tight' : 'danger'));
+
+          return `
+            <div class="content-card">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                  <span class="status-pill complete" style="margin-bottom: 0.25rem;">${sCode}</span>
+                  <h3 style="font-size: 1.25rem; color: var(--heading-deep-blue); margin-top: 0.25rem;">${sName}</h3>
+                  <p style="font-size: 0.82rem; color: var(--text-secondary);">Faculty: <strong>${sFaculty}</strong></p>
+                </div>
+                <div style="text-align: right;">
+                  <span class="status-pill ${statusClass}">${sPct}% Completed (${sStatus})</span>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-muted); margin-top: 0.35rem;">
+                    ${formatDuration(sCovered)} / ${formatDuration(sTotal)}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="progress-bar-track" style="margin-bottom: 1.25rem;">
-              <div class="progress-bar-fill" style="width: ${s.progressPercentage}%;"></div>
-            </div>
+              <div class="progress-bar-track" style="margin-bottom: 1.25rem;">
+                <div class="progress-bar-fill" style="width: ${sPct}%;"></div>
+              </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--borders-subtle); padding-top: 0.85rem;">
-              <span style="font-size: 0.8rem; color: var(--text-muted);">${formatDuration(s.remainingHours)} remaining to final target</span>
-              <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;" onclick="App.showStudentTopicBreakdown('${s.id}')">
-                📖 View Completed & Upcoming Topics
-              </button>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--borders-subtle); padding-top: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">${formatDuration(sRemaining)} remaining to final target</span>
+                <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;" onclick="App.showStudentTopicBreakdown('${sId}')">
+                  📖 View Lesson Topics & Status
+                </button>
+              </div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (err) {
-        container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
+        container.innerHTML = `<div class="content-card" style="color: #EF4444; padding: 1.5rem;">Error loading subjects: ${err.message}</div>`;
       }
     },
 
@@ -1688,50 +1775,75 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       try {
         const data = await API.getExamReadiness();
-        const exams = data.examWindows || [];
+        const exams = data.exams || data.examWindows || [];
 
         if (exams.length === 0) {
-          container.innerHTML = '<div class="content-card" style="text-align: center; padding: 2rem;">No active exam windows found.</div>';
+          container.innerHTML = `
+            <div class="content-card" style="text-align: center; padding: 2.5rem; grid-column: 1 / -1;">
+              <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎯</div>
+              <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-bottom: 0.5rem;">No Active Exam Windows Found</h3>
+              <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                Examination schedules and syllabus scope windows have not been configured for this semester yet.
+              </p>
+            </div>
+          `;
           return;
         }
 
-        container.innerHTML = exams.map(e => `
-          <div class="content-card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-              <div>
-                <span class="status-pill tight">${e.exam_type.replace('_', ' ')}</span>
-                <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-top: 0.35rem;">${e.name}</h3>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${e.start_date} to ${e.end_date}</div>
-              </div>
-              <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 800; color: var(--primary-blue);">
-                ${e.coveragePercent}%
-              </div>
-            </div>
+        container.innerHTML = exams.map(e => {
+          const rawType = e.exam_type || e.examType || 'EXAM';
+          const typeLabel = rawType.replace(/_/g, ' ');
+          const startDate = e.start_date || e.startDate || 'TBD';
+          const endDate = e.end_date || e.endDate || 'TBD';
+          const covPct = e.coveragePercent !== undefined ? e.coveragePercent : 0;
+          const inScope = e.inScopeHours !== undefined ? e.inScopeHours : (e.in_scope_hours || 0);
+          const covered = e.coveredHours !== undefined ? e.coveredHours : (e.covered_hours || 0);
+          const remaining = e.remainingHours !== undefined ? e.remainingHours : (e.remaining_hours || 0);
+          const available = e.availableHoursBeforeExam !== undefined ? e.availableHoursBeforeExam : (e.available_hours || 0);
+          const riskStatus = e.riskStatus || (covPct >= 80 ? 'LOW_RISK' : 'HIGH_RISK');
+          const riskClass = riskStatus === 'LOW_RISK' ? 'ontrack' : 'danger';
 
-            <div class="progress-bar-track" style="margin-bottom: 1rem;">
-              <div class="progress-bar-fill" style="width: ${e.coveragePercent}%;"></div>
-            </div>
+          return `
+            <div class="content-card">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                  <span class="status-pill tight">${typeLabel}</span>
+                  <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-top: 0.35rem;">${e.name}</h3>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">${startDate} to ${endDate}</div>
+                </div>
+                <div style="text-align: right;">
+                  <span class="status-pill ${riskClass}" style="margin-bottom: 0.25rem;">${riskStatus.replace(/_/g, ' ')}</span>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 800; color: var(--primary-blue);">
+                    ${covPct}%
+                  </div>
+                </div>
+              </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background-color: var(--surface-soft); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.82rem;">
-              <div>
-                <span style="color: var(--text-secondary);">In-Scope:</span>
-                <strong style="color: var(--heading-deep-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(e.inScopeHours)}</strong>
+              <div class="progress-bar-track" style="margin-bottom: 1rem;">
+                <div class="progress-bar-fill" style="width: ${covPct}%;"></div>
               </div>
-              <div>
-                <span style="color: var(--text-secondary);">Covered:</span>
-                <strong style="color: #10B981; font-family: 'JetBrains Mono', monospace;">${formatDuration(e.coveredHours)}</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-secondary);">Remaining:</span>
-                <strong style="color: #F59E0B; font-family: 'JetBrains Mono', monospace;">${formatDuration(e.remainingHours)}</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-secondary);">Available:</span>
-                <strong style="color: var(--primary-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(e.availableHoursBeforeExam)}</strong>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background-color: var(--surface-soft); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.82rem;">
+                <div>
+                  <span style="color: var(--text-secondary);">In-Scope:</span>
+                  <strong style="color: var(--heading-deep-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(inScope)}</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-secondary);">Covered:</span>
+                  <strong style="color: #10B981; font-family: 'JetBrains Mono', monospace;">${formatDuration(covered)}</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-secondary);">Remaining:</span>
+                  <strong style="color: #F59E0B; font-family: 'JetBrains Mono', monospace;">${formatDuration(remaining)}</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-secondary);">Available:</span>
+                  <strong style="color: var(--primary-blue); font-family: 'JetBrains Mono', monospace;">${formatDuration(available)}</strong>
+                </div>
               </div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (err) {
         container.innerHTML = `<div style="color: #EF4444; padding: 1.5rem;">Error: ${err.message}</div>`;
       }

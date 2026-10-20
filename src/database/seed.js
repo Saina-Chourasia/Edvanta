@@ -443,7 +443,8 @@ export async function seedDatabase() {
       { id: 'slot_it_fri', campus_id: 'camp_hitech', track_id: 'track_mirai', semester_id: 'sem_hitech_mirai_a', batch_name: 'Batch-2026-Mirai-A', subject_id: 'subj_it', faculty_id: 'usr_fac_it', weekday: 5, start_time: '10:00', end_time: '11:40', room: 'IT-Lab-3' },
 
       // Backward compatible slots for Dr. Thorne (CS301)
-      { id: 'slot_cs301_mon', campus_id: 'camp_hitech', track_id: 'track_mirai', semester_id: 'sem_hitech_mirai_a', batch_name: 'Batch-2026-Mirai-A', subject_id: 'subj_cs301', faculty_id: 'usr_fac_thorne', weekday: 1, start_time: '11:00', end_time: '11:50', room: 'Cloud-Lab' }
+      { id: 'slot_cs301_mon', campus_id: 'camp_hitech', track_id: 'track_mirai', semester_id: 'sem_hitech_mirai_a', batch_name: 'Batch-2026-Mirai-A', subject_id: 'subj_cs301', faculty_id: 'usr_fac_thorne', weekday: 1, start_time: '11:00', end_time: '11:50', room: 'Cloud-Lab' },
+      { id: 'slot_cs301_tue', campus_id: 'camp_hitech', track_id: 'track_mirai', semester_id: 'sem_hitech_mirai_a', batch_name: 'Batch-2026-Mirai-A', subject_id: 'subj_cs301', faculty_id: 'usr_fac_thorne', weekday: 2, start_time: '15:00', end_time: '15:50', room: 'Cloud-Lab' }
     ];
 
     tx.run("DELETE FROM timetable_slots WHERE semester_id = 'sem_hitech_mirai_a'");
