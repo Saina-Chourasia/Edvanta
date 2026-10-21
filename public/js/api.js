@@ -5,22 +5,45 @@ const API = {
   baseUrl: '',
 
   getToken() {
-    return localStorage.getItem('edvanta_token') || '';
+    const fromStorage = localStorage.getItem('edvanta_token') || sessionStorage.getItem('edvanta_token');
+    if (fromStorage) return fromStorage;
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/(?:^|;\s*)edvanta_token=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+    return '';
   },
 
   setToken(token) {
-    if (token) localStorage.setItem('edvanta_token', token);
-    else localStorage.removeItem('edvanta_token');
+    if (token) {
+      localStorage.setItem('edvanta_token', token);
+      sessionStorage.setItem('edvanta_token', token);
+      if (typeof document !== 'undefined') {
+        document.cookie = `edvanta_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax; Max-Age=604800`;
+      }
+    } else {
+      localStorage.removeItem('edvanta_token');
+      sessionStorage.removeItem('edvanta_token');
+      if (typeof document !== 'undefined') {
+        document.cookie = 'edvanta_token=; Path=/; SameSite=Lax; Max-Age=0';
+      }
+    }
   },
 
   getCurrentUser() {
-    const raw = localStorage.getItem('edvanta_user');
+    const raw = localStorage.getItem('edvanta_user') || sessionStorage.getItem('edvanta_user');
     return raw ? JSON.parse(raw) : null;
   },
 
   setCurrentUser(user) {
-    if (user) localStorage.setItem('edvanta_user', JSON.stringify(user));
-    else localStorage.removeItem('edvanta_user');
+    if (user) {
+      const str = JSON.stringify(user);
+      localStorage.setItem('edvanta_user', str);
+      sessionStorage.setItem('edvanta_user', str);
+    } else {
+      localStorage.removeItem('edvanta_user');
+      sessionStorage.removeItem('edvanta_user');
+    }
   },
 
   async request(endpoint, options = {}) {
@@ -91,6 +114,23 @@ const API = {
     return data;
   },
 
+  async sendPhoneOTP(phone) {
+    return this.request('/api/auth/otp/send', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+  },
+
+  async verifyPhoneOTP(phone, code) {
+    const data = await this.request('/api/auth/otp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code })
+    });
+    this.setToken(data.token);
+    this.setCurrentUser(data.user);
+    return data;
+  },
+
   async changePassword(currentPassword, newPassword) {
     return this.request('/api/auth/change-password', {
       method: 'POST',
@@ -130,7 +170,12 @@ const API = {
     return this.request('/api/auth/demo-users');
   },
 
-  logout() {
+  async logout() {
+    try {
+      await this.request('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // ignore
+    }
     this.setToken(null);
     this.setCurrentUser(null);
   },
@@ -325,15 +370,104 @@ const API = {
     });
   },
 
+  async submitAttendanceBLE(data) {
+    return this.request('/api/attendance/submit-ble', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getSessionRoster(sessionId) {
+    return this.request(`/api/attendance/sessions/${sessionId}/roster`);
+  },
+
+  async markAttendanceManual(data) {
+    return this.request('/api/attendance/mark-manual', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async finalizeUnrecordedAttendance(sessionId) {
+    return this.request(`/api/attendance/sessions/${sessionId}/finalize-unrecorded`, {
+      method: 'POST'
+    });
+  },
+
   async getAttendanceRecords(params = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request(`/api/attendance/records${query ? '?' + query : ''}`);
+  },
+
+  async getAttendanceDashboardSummary() {
+    return this.request('/api/attendance/dashboard-summary');
   },
 
   async updateAttendanceRecord(id, data) {
     return this.request(`/api/attendance/records/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
+    });
+  },
+
+  // AI Academic Assistant (Phase 1)
+  async sendAIChat(prompt, history = []) {
+    return this.request('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, history })
+    });
+  },
+
+  async getAIStatus() {
+    return this.request('/api/ai/status');
+  },
+
+  // Telegram Academic Bot (Phase 2)
+  async getTelegramStatus() {
+    return this.request('/api/telegram/status');
+  },
+
+  async generateTelegramLinkCode() {
+    return this.request('/api/telegram/link-code', {
+      method: 'POST'
+    });
+  },
+
+  async unlinkTelegram() {
+    return this.request('/api/telegram/unlink', {
+      method: 'POST'
+    });
+  },
+
+  // WhatsApp Business Platform (Phase 3)
+  async getWhatsAppStatus() {
+    return this.request('/api/whatsapp/status');
+  },
+
+  async requestWhatsAppCode(phoneNumber) {
+    return this.request('/api/whatsapp/request-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone_number: phoneNumber })
+    });
+  },
+
+  async verifyWhatsAppCode(phoneNumber, code) {
+    return this.request('/api/whatsapp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone_number: phoneNumber, code })
+    });
+  },
+
+  async unlinkWhatsApp() {
+    return this.request('/api/whatsapp/unlink', {
+      method: 'POST'
+    });
+  },
+
+  async updateWhatsAppPreferences(preferences) {
+    return this.request('/api/whatsapp/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(preferences)
     });
   }
 };

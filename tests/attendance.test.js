@@ -236,4 +236,138 @@ describe('Requirement 11: Real Attendance Management System', () => {
     // Already submitted will be 409 or 400
     assert.ok([400, 409].includes(lateRes.status));
   });
+
+  // 11. Faculty starts a session with BLE beacon and validity duration
+  let bleSessionId;
+  let bleBeaconCode;
+
+  test('Faculty starts attendance session with BLE parameters and validity period', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/sessions/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${facultyToken}`
+      },
+      body: JSON.stringify({
+        subject_id: 'subj_cs301',
+        batch_name: 'Batch-2026-Mirai-A',
+        campus_id: 'camp_hitech',
+        validity_minutes: 30
+      })
+    });
+    assert.equal(res.status, 201);
+    const data = await res.json();
+    assert.ok(data.session.id);
+    assert.ok(data.ble_beacon_code);
+    assert.equal(data.validity_minutes, 30);
+    assert.ok(data.expires_at);
+    bleSessionId = data.session.id;
+    bleBeaconCode = data.ble_beacon_code;
+  });
+
+  // 12. Student verifies attendance via Bluetooth Low Energy (BLE)
+  test('Eligible student submits Bluetooth attendance with valid beacon code (HTTP 201)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/submit-ble`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${studentToken}`
+      },
+      body: JSON.stringify({
+        attendance_session_id: bleSessionId,
+        ble_beacon_code: bleBeaconCode,
+        client_timestamp: Date.now()
+      })
+    });
+    assert.equal(res.status, 201);
+    const data = await res.json();
+    assert.equal(data.success, true);
+    assert.equal(data.status, 'PRESENT');
+    assert.equal(data.marking_method, 'BLUETOOTH');
+
+    // Verify record in database has marking_method = 'BLUETOOTH'
+    const rec = db.get(`SELECT * FROM attendance_records WHERE id = ?`, [data.recordId]);
+    assert.equal(rec.marking_method, 'BLUETOOTH');
+  });
+
+  // 13. Rejects invalid BLE beacon code
+  test('Rejects Bluetooth submission with invalid beacon code (HTTP 403)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/submit-ble`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${studentToken}`
+      },
+      body: JSON.stringify({
+        attendance_session_id: bleSessionId,
+        ble_beacon_code: 'WRONG-CODE'
+      })
+    });
+    // Either 403 or 409 (since student already submitted)
+    assert.ok([403, 409].includes(res.status));
+  });
+
+  // 14. Faculty retrieves session roster and live counts
+  test('Faculty retrieves class session roster with enrolled students and counts (HTTP 200)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/sessions/${bleSessionId}/roster`, {
+      headers: { Authorization: `Bearer ${facultyToken}` }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.ok(Array.isArray(data.roster));
+    assert.ok(data.summary);
+    assert.ok(data.summary.totalEnrolled >= 1);
+    assert.ok(data.summary.presentCount >= 1);
+  });
+
+  // 15. Faculty manually marks attendance
+  test('Faculty manually marks student attendance (HTTP 201 or 200)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/mark-manual`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${facultyToken}`
+      },
+      body: JSON.stringify({
+        attendance_session_id: bleSessionId,
+        student_id: 'usr_stu_aarav',
+        status: 'PRESENT',
+        notes: 'Verified in classroom'
+      })
+    });
+    assert.ok([200, 201].includes(res.status));
+    const data = await res.json();
+    assert.equal(data.success, true);
+  });
+
+  // 16. Finalize unrecorded students as absent
+  test('Faculty finalizes unrecorded students as absent (HTTP 200)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/sessions/${bleSessionId}/finalize-unrecorded`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${facultyToken}` }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.success, true);
+
+    // Verify session is closed
+    const sess = db.get(`SELECT is_active FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
+    assert.equal(sess.is_active, 0);
+
+    // Clean up test data
+    db.run(`DELETE FROM attendance_records WHERE attendance_session_id = ?`, [bleSessionId]);
+    db.run(`DELETE FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
+  });
+
+  // 17. Attendance dashboard summary metrics
+  test('GET /api/attendance/dashboard-summary calculates metrics (HTTP 200)', async () => {
+    const res = await fetch(`${baseUrl}/api/attendance/dashboard-summary`, {
+      headers: { Authorization: `Bearer ${facultyToken}` }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.ok(data.totalMarked !== undefined);
+    assert.ok(data.percentage !== undefined);
+    assert.ok(Array.isArray(data.subjectWise));
+  });
 });

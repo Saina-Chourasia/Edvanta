@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EDVANTA — MSOT Academic Progression Tracker</title>
   <meta name="description" content="EDVANTA: Real-time course progression tracker, syllabus delivery analytics, and exam readiness for MSOT. Every Hour Counts, Every Goal Matters.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -16,20 +19,66 @@
   <header id="publicTopNav" class="public-top-nav">
     <div class="public-top-nav-inner">
       <a href="#" class="brand-section" onclick="App.showLandingPage(event)">
-        <div class="brand-icon">E</div>
-        <div class="brand-info">
-          <h1>EDVANTA <span class="brand-badge">MSOT</span></h1>
-          <p>Every Hour Counts, Every Goal Matters.</p>
+        <div class="brand-logo-container">
+          <svg class="edvanta-logo-svg" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EDVANTA Logo">
+            <!-- Graduation Cap Mortarboard -->
+            <path d="M22 4L4 13.5L22 23L40 13.5L22 4Z" fill="url(#capGradNav)" stroke="#60A5FA" stroke-width="1.5" stroke-linejoin="round"/>
+            <!-- Gold Tassel -->
+            <path d="M38 14V26" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="38" cy="27.5" r="1.8" fill="#F59E0B"/>
+            <!-- Blue Stylized E symbol integrated under the cap -->
+            <path d="M13 20H31V24H18.5V27.5H28.5V31.5H18.5V35H31V39H13V20Z" fill="url(#capGradNav)"/>
+            <defs>
+              <linearGradient id="capGradNav" x1="4" y1="4" x2="40" y2="39" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3B82F6"/>
+                <stop offset="1" stop-color="#1D4ED8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="brand-info">
+            <div class="brand-title-row">
+              <span class="brand-wordmark">EDVANTA</span>
+              <span class="brand-badge">MSOT</span>
+            </div>
+            <span class="brand-tagline">TRACK. LEARN. PROGRESS.</span>
+          </div>
         </div>
       </a>
 
-      <div class="public-nav-actions">
-        <div class="campuses-pill-group">
-          <span>🏛️</span>
-          <span>Campuses: <strong>HI-Tech</strong> • <strong>Jagannath</strong> • <strong>Rathinam</strong></span>
+      <!-- Center Nav Links -->
+      <nav class="public-nav-links" id="publicNavLinks">
+        <a href="#home" class="nav-link active" onclick="App.showLandingPage(event)">Home</a>
+        <a href="#features" class="nav-link" onclick="App.openExploreFeaturesModal(event)">Features</a>
+        <a href="#about" class="nav-link" onclick="App.openAboutModal(event)">About</a>
+        <a href="#contact" class="nav-link" onclick="App.openContactModal(event)">Contact</a>
+      </nav>
+
+      <!-- Right Nav Actions: Authenticated vs Unauthenticated -->
+      <div class="public-nav-actions" id="publicNavActions">
+        <div id="navAuthenticatedContainer" class="nav-auth-user" style="display: none;">
+          <div class="nav-user-pill">
+            <span class="nav-user-avatar" id="navUserAvatar">U</span>
+            <div class="nav-user-meta">
+              <span class="nav-user-name" id="navUserName">User</span>
+              <span class="nav-role-badge" id="navRoleBadge">ROLE</span>
+            </div>
+          </div>
+          <button type="button" class="btn-primary btn-nav-portal" onclick="App.returnToPortal()">
+            Enter Portal →
+          </button>
+          <button type="button" class="btn-secondary btn-nav-logout" onclick="App.handleLogout()" title="Sign Out">
+            Sign Out
+          </button>
         </div>
-        <button type="button" class="btn-primary" onclick="App.showLoginView()">
-          Sign In to Portal →
+
+        <div id="navUnauthenticatedContainer">
+          <button type="button" class="btn-nav-login" onclick="App.openAuthModal()">
+            Login →
+          </button>
+        </div>
+
+        <button type="button" class="nav-mobile-toggle" onclick="App.togglePublicMobileNav()" aria-label="Toggle Navigation">
+          ☰
         </button>
       </div>
     </div>
@@ -39,149 +88,119 @@
   <!-- SECTION 2 & 3: BEAUTIFUL LANDING PAGE      -->
   <!-- ========================================== -->
   <main id="landingView" class="landing-view-wrapper">
-    <!-- Hero Section -->
-    <section class="landing-hero">
-      <div class="hero-pill-tag">
-        <span>✨</span>
-        <span>MSOT Educational Progression Platform</span>
-      </div>
-      <h1 class="landing-heading">Your Academic Journey, Clearly Tracked.</h1>
-      <p class="landing-desc">
-        Manage academic progression, track syllabus completion, organize timetables, and monitor attendance through one simple academic platform.
-      </p>
+    <!-- Full-Screen Hero Section directly below Navbar -->
+    <section class="landing-hero" id="landingHero">
+      <div class="hero-overlay"></div>
+      <div class="hero-container">
+        <!-- Modern Typography & Actions directly over sunset study-desk background -->
+        <div class="hero-left-col">
+          <div class="hero-institution-pill">
+            <svg class="hero-pill-icon-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+            </svg>
+            <span>MIRAI SCHOOL OF TECHNOLOGY</span>
+          </div>
 
-      <div class="landing-hero-actions">
-        <button type="button" class="btn-primary" style="font-size: 1.05rem; padding: 0.85rem 1.85rem;" onclick="App.showLoginView()">
-          Access Your Portal →
-        </button>
-        <a href="#featureCardsSection" class="btn-secondary" style="font-size: 1.05rem; padding: 0.85rem 1.6rem;">
-          Explore Features ↓
-        </a>
+          <h1 class="landing-hero-heading">
+            <span class="hero-line-navy">Every hour counts.</span>
+            <span class="hero-line-cobalt">Every goal matters.</span>
+          </h1>
+
+          <p class="landing-hero-desc">
+            A smarter way to stay connected with your academic journey. Track progress, manage learning, and achieve more together.
+          </p>
+
+          <div class="landing-hero-actions">
+            <button type="button" id="btnHeroGetStarted" class="btn-primary hero-btn-main" onclick="App.handleHeroGetStarted()">
+              Get Started →
+            </button>
+            <button type="button" class="btn-secondary hero-btn-sub" onclick="App.openExploreFeaturesModal()">
+              Explore Features
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div class="landing-highlights">
-        <div class="highlight-item">📈 Real-Time Syllabus Progression</div>
-        <div class="highlight-item">📅 Conflict-Free Master Timetables</div>
-        <div class="highlight-item">⏱️ Direct Faculty Attendance Logging</div>
-        <div class="highlight-item">🎯 Exam Readiness & Risk Forecasting</div>
-      </div>
+      <!-- Subtle Scroll Down Indicator -->
+      <a href="#landingCampuses" class="hero-scroll-hint" onclick="App.scrollToCampuses(event)" aria-label="Scroll to Campuses">
+        <span class="hero-scroll-text">Explore Campuses</span>
+        <svg class="hero-scroll-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+        </svg>
+      </a>
     </section>
 
-    <!-- 5 Clickable Feature Cards (Section 3) -->
-    <section id="featureCardsSection">
-      <div class="feature-section-header">
-        <h2>Core Academic Capabilities</h2>
-        <p>Built specifically for MSOT administrators, faculty members, and students.</p>
-      </div>
+    <!-- MSOT Unified Campus Network Section (Appears when scrolling down) -->
+    <section class="landing-campuses-section campuses-showcase-card" id="landingCampuses">
+      <div class="landing-campuses-container">
+        <div class="campuses-header-row">
+          <div class="campuses-header-text">
+            <div class="campuses-badge">
+              <span class="campuses-badge-dot"></span>
+              <span>Regional Campuses</span>
+            </div>
+            <h2 class="campuses-section-title">MSOT Unified Campus Network</h2>
+            <p class="campuses-section-subtitle">Standardized curriculum delivery and pacing across all three regional campuses.</p>
+          </div>
+          <div class="campuses-status-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <span class="status-pill complete" style="background: transparent; border: none; padding: 0; color: inherit; font-size: inherit; font-weight: inherit;">3 Active Campuses</span>
+          </div>
+        </div>
 
-      <div class="feature-cards-grid">
-        <!-- Card 1: Academic Progression -->
-        <div class="feature-card" onclick="App.handleFeatureCardClick('curriculum')">
-          <div>
-            <div class="feature-card-icon">📈</div>
-            <div class="feature-card-title">Academic Progression</div>
-            <div class="feature-card-desc">
-              Track subject-wise syllabus completion and academic progress.
+        <div class="campuses-grid">
+          <div class="campus-card campus-box">
+            <div class="campus-card-icon-wrapper campus-box-icon">
+              <svg class="campus-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+              </svg>
+            </div>
+            <div class="campus-card-content">
+              <div class="campus-card-title campus-box-title">HI-Tech Campus</div>
+              <div class="campus-card-location campus-box-subtitle">Ghaziabad, Uttar Pradesh</div>
+            </div>
+            <div class="campus-card-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
             </div>
           </div>
-          <div class="feature-card-footer">
-            <span>Explore Progression</span>
-            <span class="feature-card-arrow">→</span>
-          </div>
-        </div>
 
-        <!-- Card 2: Timetable -->
-        <div class="feature-card" onclick="App.handleFeatureCardClick('calendar')">
-          <div>
-            <div class="feature-card-icon">📅</div>
-            <div class="feature-card-title">Timetable</div>
-            <div class="feature-card-desc">
-              View organized academic schedules and upcoming sessions.
+          <div class="campus-card campus-box">
+            <div class="campus-card-icon-wrapper campus-box-icon">
+              <svg class="campus-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+              </svg>
+            </div>
+            <div class="campus-card-content">
+              <div class="campus-card-title campus-box-title">Jagannath Campus</div>
+              <div class="campus-card-location campus-box-subtitle">Jaipur, Rajasthan</div>
+            </div>
+            <div class="campus-card-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
             </div>
           </div>
-          <div class="feature-card-footer">
-            <span>View Timetables</span>
-            <span class="feature-card-arrow">→</span>
-          </div>
-        </div>
 
-        <!-- Card 3: Attendance -->
-        <div class="feature-card" onclick="App.handleFeatureCardClick('attendance')">
-          <div>
-            <div class="feature-card-icon">⏱️</div>
-            <div class="feature-card-title">Attendance</div>
-            <div class="feature-card-desc">
-              Access attendance features according to the user's role and permissions.
+          <div class="campus-card campus-box">
+            <div class="campus-card-icon-wrapper campus-box-icon">
+              <svg class="campus-svg-icon" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+              </svg>
             </div>
-          </div>
-          <div class="feature-card-footer">
-            <span>Access Attendance</span>
-            <span class="feature-card-arrow">→</span>
-          </div>
-        </div>
-
-        <!-- Card 4: Reports & Insights -->
-        <div class="feature-card" onclick="App.handleFeatureCardClick('dashboard')">
-          <div>
-            <div class="feature-card-icon">📊</div>
-            <div class="feature-card-title">Reports & Insights</div>
-            <div class="feature-card-desc">
-              Review authorized academic reports and progress summaries.
+            <div class="campus-card-content">
+              <div class="campus-card-title campus-box-title">Rathinam Campus</div>
+              <div class="campus-card-location campus-box-subtitle">Bengaluru, Karnataka</div>
             </div>
-          </div>
-          <div class="feature-card-footer">
-            <span>View Insights</span>
-            <span class="feature-card-arrow">→</span>
-          </div>
-        </div>
-
-        <!-- Card 5: Login to Your Portal -->
-        <div class="feature-card login-highlight" onclick="App.showLoginView()">
-          <div>
-            <div class="feature-card-icon">🔐</div>
-            <div class="feature-card-title">Login to Your Portal</div>
-            <div class="feature-card-desc">
-              Sign in as Admin, Faculty, or Student.
+            <div class="campus-card-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
             </div>
-          </div>
-          <div class="feature-card-footer">
-            <span>Choose Your Portal</span>
-            <span class="feature-card-arrow">→</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Campuses Showcase (Section 12) -->
-    <section class="campuses-showcase-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-          <h3 style="color: var(--heading-deep-blue); font-size: 1.35rem;">MSOT Unified Campus Network</h3>
-          <p>Standardized curriculum delivery and pacing across all three regional campuses.</p>
-        </div>
-        <span class="status-pill complete">3 Active Campuses</span>
-      </div>
-
-      <div class="campuses-grid">
-        <div class="campus-box">
-          <div class="campus-box-icon">🏛️</div>
-          <div>
-            <div class="campus-box-title">HI-Tech Campus</div>
-            <div class="campus-box-subtitle">Code: HIT • Asia/Kolkata</div>
-          </div>
-        </div>
-        <div class="campus-box">
-          <div class="campus-box-icon">🏛️</div>
-          <div>
-            <div class="campus-box-title">Jagannath Campus</div>
-            <div class="campus-box-subtitle">Code: JAG • Asia/Kolkata</div>
-          </div>
-        </div>
-        <div class="campus-box">
-          <div class="campus-box-icon">🏛️</div>
-          <div>
-            <div class="campus-box-title">Rathinam Campus</div>
-            <div class="campus-box-subtitle">Code: RAT • Asia/Kolkata</div>
           </div>
         </div>
       </div>
@@ -230,6 +249,27 @@
       <div class="login-form-title">
         <h3 id="loginPortalHeading">Sign In as Faculty</h3>
         <p id="loginPortalSubtitle">Enter your registered email address or phone number</p>
+      </div>
+
+      <!-- Quick Social & Phone Login in Login View -->
+      <div style="margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.65rem;">
+        <button type="button" class="btn-google-oauth" onclick="App.handleGoogleOAuthClick()">
+          <svg class="google-logo-svg" viewBox="0 0 24 24" width="20" height="20">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.27 21.43 7.35 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.13z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.57 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+        <button type="button" class="btn-secondary" style="width: 100%; padding: 0.65rem; font-size: 0.88rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="App.openAuthModal()">
+          <span>📱</span>
+          <span>Continue with Phone / OTP</span>
+        </button>
+      </div>
+
+      <div class="auth-divider" style="margin-bottom: 1.25rem;">
+        <span>OR USE INSTITUTIONAL CREDENTIALS</span>
       </div>
 
       <!-- Friendly Notice Banner -->
@@ -327,11 +367,24 @@
       <div>
         <!-- Sidebar Brand Header -->
         <div class="sidebar-header">
-          <a href="#" class="sidebar-brand" onclick="App.handleBrandClick(event)">
-            <div class="brand-icon" style="width: 32px; height: 32px; font-size: 1rem;">E</div>
-            <div class="sidebar-brand-text">
-              <span style="font-weight: 800; color: var(--heading-deep-blue); font-size: 1.05rem;">EDVANTA</span>
-              <span class="brand-badge">MSOT</span>
+          <a href="#" class="sidebar-brand" onclick="App.handleBrandClick(event)" title="EDVANTA — Return to Home">
+            <div class="brand-logo-container" style="gap: 0.65rem;">
+              <svg class="edvanta-logo-svg" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EDVANTA Logo" style="width: 34px; height: 34px;">
+                <path d="M22 4L4 13.5L22 23L40 13.5L22 4Z" fill="url(#capGradSidebar)" stroke="#60A5FA" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M38 14V26" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="38" cy="27.5" r="1.8" fill="#F59E0B"/>
+                <path d="M13 20H31V24H18.5V27.5H28.5V31.5H18.5V35H31V39H13V20Z" fill="url(#capGradSidebar)"/>
+                <defs>
+                  <linearGradient id="capGradSidebar" x1="4" y1="4" x2="40" y2="39" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#3B82F6"/>
+                    <stop offset="1" stop-color="#1D4ED8"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="sidebar-brand-text">
+                <span class="brand-wordmark" style="font-weight: 800; color: var(--heading-deep-blue); font-size: 1.15rem; letter-spacing: 0.03em;">EDVANTA</span>
+                <span class="brand-badge">MSOT</span>
+              </div>
             </div>
           </a>
           <button type="button" class="sidebar-toggle-btn" title="Toggle Sidebar" onclick="App.toggleSidebarDesktop()">
@@ -358,15 +411,33 @@
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
         <button type="button" class="sidebar-footer-btn" onclick="App.showLandingPage()">
-          <span class="nav-icon">🌐</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          </span>
           <span>View Public Home</span>
         </button>
+        <button type="button" class="sidebar-footer-btn" onclick="App.openTelegramModal()">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </span>
+          <span>Telegram Bot</span>
+        </button>
+        <button type="button" class="sidebar-footer-btn" onclick="App.openWhatsAppModal()">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          </span>
+          <span>WhatsApp Alerts</span>
+        </button>
         <button type="button" class="sidebar-footer-btn" onclick="App.openChangePasswordModal()">
-          <span class="nav-icon">🔑</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </span>
           <span>Change Password</span>
         </button>
         <button type="button" class="sidebar-footer-btn logout" onclick="App.handleLogout()">
-          <span class="nav-icon">🚪</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </span>
           <span>Sign Out</span>
         </button>
       </div>
@@ -380,42 +451,131 @@
           <button type="button" class="hamburger-btn" onclick="App.toggleSidebarMobile(true)">
             ☰
           </button>
-          <span id="currentPortalNamePill" class="portal-role-pill">👑 ADMIN PORTAL</span>
+          <span id="currentPortalNamePill" class="portal-role-pill">ADMIN PORTAL</span>
+
+          <!-- Topbar Campus Selector -->
+          <select id="topbarCampusSelect" class="topbar-campus-select" onchange="App.handleTopbarCampusChange(this.value)" title="Select Campus">
+            <option value="">All Campuses (3)</option>
+          </select>
+
+          <!-- Topbar Global Search Box -->
+          <div class="topbar-search-box">
+            <span class="search-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input type="text" id="topbarSearchInput" placeholder="Search courses, faculty, students..." oninput="App.handleTopbarSearch(this.value)" autocomplete="off">
+          </div>
         </div>
 
         <div class="app-topbar-right">
           <!-- Simulation Date Pill -->
           <div class="sim-date-pill" id="simDatePillWrapper" title="Simulated date for pacing & alert checks">
-            <span>🕒</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             <span id="activeSimDateDisplay">2026-10-19</span>
             <button id="btnAdvance2Days" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.68rem; margin-left: 0.25rem;">+2 Days</button>
             <button id="btnResetSim" class="btn-secondary" style="padding: 0.15rem 0.35rem; font-size: 0.68rem;">↺</button>
           </div>
 
           <!-- Alert Notification Bell -->
-          <button class="btn-icon" id="btnAlertsBell" title="Missed Session Alerts & Escalations" onclick="App.switchTab('alerts')">
-            🔔
-            <span id="alertsBadge" class="badge-counter" style="display: none; position: absolute; top: -4px; right: -4px; background: #EF4444; color: #fff; font-size: 0.65rem; font-weight: 800; border-radius: 50%; width: 16px; height: 16px; display: none; align-items: center; justify-content: center;">0</span>
+          <button class="btn-icon" id="btnAlertsBell" title="Missed Session Alerts & Escalations" onclick="App.switchTab('alerts')" style="position: relative;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span id="alertsBadge" class="badge-counter" style="display: none; position: absolute; top: -4px; right: -4px; background: #EF4444; color: #fff; font-size: 0.65rem; font-weight: 800; border-radius: 50%; width: 16px; height: 16px; align-items: center; justify-content: center;">0</span>
           </button>
         </div>
       </header>
 
       <!-- Scrollable Tab Content Container -->
       <div class="app-content-body">
-
         <!-- ========================================== -->
         <!-- TAB 1: EXECUTIVE DASHBOARD                 -->
         <!-- ========================================== -->
         <section id="view-dashboard" class="tab-view-content" style="display: none;">
-          <div class="content-page-header">
-            <div>
-              <h2>Executive Academic Dashboard</h2>
-              <p>Real-time curriculum progression, pace vs plan, and zero-masking track health status.</p>
+          <!-- 1. Dashboard Welcome Greeting Section -->
+          <div class="portal-welcome-card morning" id="adminWelcomeCard">
+            <div class="welcome-bg-artwork" aria-hidden="true"></div>
+            <div class="welcome-text-col">
+              <div class="welcome-pill-row">
+                <span class="welcome-meta-pill">🏛️ MSOT ACADEMIC TRACKER</span>
+                <span class="welcome-meta-pill" id="adminSessionTimePill">AY 2026–2027</span>
+              </div>
+              <div class="welcome-greeting-title">
+                <span id="adminGreetingEmoji" class="greeting-emoji">☀️</span>
+                <h2 id="adminWelcomeGreeting" class="welcome-heading">Good Morning, Admin</h2>
+              </div>
+              <p id="adminWelcomeSubtitle" class="welcome-subtitle">
+                Welcome back, Administrator • MSOT Academic Progression Tracker • Real-time curriculum progression, pace vs plan, and zero-masking track health status.
+              </p>
             </div>
-            <div>
-              <a href="/api/exports/export/progress-report" target="_blank" class="btn-secondary">
-                📥 Export Academic CSV
-              </a>
+          </div>
+
+          <!-- 2. Semester / Timetable / Syllabus / Exams Cards -->
+          <div class="quick-access-grid">
+            <div class="quick-access-card" onclick="App.switchTab('curriculum')" title="View Semester Curriculum & Batches">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Semester</div>
+                <div class="quick-access-desc" id="quickSemesterDesc">Academic Term & Batches</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('calendar')" title="View Master Class Timetable">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Timetable</div>
+                <div class="quick-access-desc">Master Class Schedule</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('curriculum')" title="View 7 Core Curriculum Subjects">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Syllabus</div>
+                <div class="quick-access-desc">7 Core Subjects & Units</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('exams')" title="View Exam Windows & Pacing Targets">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <circle cx="12" cy="12" r="6"></circle>
+                  <circle cx="12" cy="12" r="2"></circle>
+                </svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Exams</div>
+                <div class="quick-access-desc">Readiness & Target Windows</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
             </div>
           </div>
 
@@ -483,7 +643,7 @@
             <div class="kpi-card">
               <div class="kpi-card-label">Overall Buffer Ratio</div>
               <div id="kpiBufferRatio" class="kpi-card-value">--</div>
-              <div class="kpi-card-desc">Available / Remaining (>1.1 On Track)</div>
+              <div class="kpi-card-desc">Available / Remaining (&gt;1.1 On Track)</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-card-label">Overdue Topics</div>
@@ -492,27 +652,17 @@
             </div>
           </div>
 
-          <!-- Charts -->
-          <div class="charts-grid">
-            <div class="chart-card">
-              <h3 style="font-size: 1rem; color: var(--heading-deep-blue); margin-bottom: 1rem;">Planned vs Covered vs Available Hours by Subject</h3>
-              <div class="chart-wrapper">
-                <canvas id="chartHoursOverview"></canvas>
-              </div>
-            </div>
-
-            <div class="chart-card">
-              <h3 style="font-size: 1rem; color: var(--heading-deep-blue); margin-bottom: 1rem;">Track Health Breakdown</h3>
-              <div class="chart-wrapper">
-                <canvas id="chartStatusBreakdown"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <!-- Subjects Progression Table -->
-          <div class="content-card">
+          <!-- 3. Subject Progress (Full-Width Section) -->
+          <div class="content-card full-width-panel" id="subjectProgressPanel">
             <div class="card-title-bar">
-              <h3>7 Core Curriculum Subjects Progression</h3>
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <h3>Subject Progress</h3>
+              </div>
               <span class="status-pill complete">Live Sync</span>
             </div>
             <div class="table-responsive">
@@ -536,6 +686,87 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Curriculum Analytics Charts (Integrated Full-Width Inside Panel) -->
+            <div class="charts-grid" style="margin-top: 1.75rem;">
+              <div class="chart-card">
+                <h3 style="font-size: 0.95rem; color: var(--heading-deep-blue); margin-bottom: 0.85rem;">Planned vs Covered vs Available Hours by Subject</h3>
+                <div class="chart-wrapper">
+                  <canvas id="chartHoursOverview"></canvas>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <h3 style="font-size: 0.95rem; color: var(--heading-deep-blue); margin-bottom: 0.85rem;">Track Health Breakdown</h3>
+                <div class="chart-wrapper">
+                  <canvas id="chartStatusBreakdown"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Needs Attention (Full-Width Section) -->
+          <div class="content-card full-width-panel" id="needsAttentionPanel">
+            <div class="card-title-bar">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3>Needs Attention</h3>
+              </div>
+              <span id="attentionCountBadge" class="attention-badge warning" style="display: none;">0 Items</span>
+            </div>
+            <div id="needsAttentionList" class="needs-attention-grid">
+              <div style="padding: 1rem 0; text-align: center; font-size: 0.85rem; color: var(--text-secondary);">
+                Evaluating subject health & pacing...
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Upcoming Events (Full-Width Section) -->
+          <div class="content-card full-width-panel" id="upcomingEventsPanel">
+            <div class="card-title-bar">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <h3>Upcoming Events & Exams</h3>
+              </div>
+              <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.switchTab('calendar')">
+                View Schedule
+              </button>
+            </div>
+            <div id="upcomingEventsList" class="upcoming-events-grid">
+              <div style="padding: 1rem 0; text-align: center; font-size: 0.85rem; color: var(--text-secondary);">
+                Loading scheduled academic events...
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Recent Activity (Full-Width Section with Internal Scrolling) -->
+          <div class="content-card full-width-panel" id="recentActivityPanel">
+            <div class="card-title-bar">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <h3>Recent Activity</h3>
+              </div>
+              <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.switchTab('history')">
+                Full Log
+              </button>
+            </div>
+            <div id="recentActivityList" class="activity-scroll-panel">
+              <div style="padding: 1rem 0; text-align: center; font-size: 0.85rem; color: var(--text-secondary);">
+                Loading recent sessions...
+              </div>
+            </div>
           </div>
         </section>
 
@@ -554,19 +785,37 @@
           </div>
 
           <!-- Active Attendance Session Banner (Student View) -->
-          <div id="studentActiveAttendanceCard" class="attendance-active-banner" style="display: none;">
-            <div>
-              <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                <span class="attendance-pulse-dot"></span>
-                <strong style="color: var(--heading-deep-blue); font-size: 1.1rem;" id="activeAttSubjectTitle">Active Class Attendance Session</strong>
+          <div id="studentActiveAttendanceCard" class="attendance-active-banner" style="display: none; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                  <span class="attendance-pulse-dot"></span>
+                  <strong style="color: var(--heading-deep-blue); font-size: 1.1rem;" id="activeAttSubjectTitle">Active Class Attendance Session</strong>
+                  <span id="activeAttBeaconBadge" class="status-pill ontrack" style="font-size: 0.75rem; display: none;">BLE: EDV-0000</span>
+                </div>
+                <p id="activeAttFacultyInfo" style="margin: 0; font-size: 0.88rem; color: var(--text-secondary);">
+                  Instructor initiated attendance. Choose your check-in method below.
+                </p>
               </div>
-              <p id="activeAttFacultyInfo" style="margin: 0; font-size: 0.88rem; color: var(--text-secondary);">
-                Instructor initiated attendance. Click below to verify your presence.
-              </p>
+              <div id="studentAttCountdown" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: var(--primary-blue); background: var(--surface-soft); padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--borders);">
+                ⏱️ Active Session
+              </div>
             </div>
-            <button type="button" id="btnSubmitStudentAttendance" class="btn-primary" style="padding: 0.75rem 1.75rem; font-size: 1rem;" onclick="App.submitCurrentAttendance()">
-              ✅ Mark Present Now
-            </button>
+
+            <!-- Check-in Action Buttons -->
+            <div id="studentCheckInActions" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem;">
+              <button type="button" id="btnSubmitBLEAttendance" class="btn-primary" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.65rem 1.25rem;" onclick="App.submitBluetoothAttendance()">
+                <span>🔵</span>
+                <span>Check In via Bluetooth (BLE)</span>
+              </button>
+              <button type="button" id="btnSubmitStudentAttendance" class="btn-secondary" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.65rem 1.25rem;" onclick="App.submitCurrentAttendance()">
+                <span>🌐</span>
+                <span>Standard Web Check-In</span>
+              </button>
+            </div>
+            <div id="studentBLESupportNote" style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+              💡 <em>Bluetooth check-in requires a supported browser (Chrome/Edge on Desktop/Android) and classroom beacon proximity. If unsupported, use Standard Web Check-In.</em>
+            </div>
           </div>
 
           <!-- Attendance KPI Summary -->
@@ -603,23 +852,66 @@
 
           <!-- Faculty Active Session Card -->
           <div id="facultyActiveSessionCard" class="content-card" style="display: none; border-color: var(--primary-blue);">
-            <div class="card-title-bar">
+            <div class="card-title-bar" style="flex-wrap: wrap; gap: 0.75rem;">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span class="attendance-pulse-dot"></span>
                 <h3 id="facActiveSessionTitle">Active Attendance Session in Progress</h3>
+                <span id="facSessionBeaconPill" class="status-pill ontrack" style="font-size: 0.75rem;">BLE: Active</span>
               </div>
-              <button type="button" class="btn-danger" id="btnCloseAttSessionBtn" onclick="App.closeCurrentAttendanceSession()">
-                ⏹ End & Close Attendance Session
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="btn-primary" style="font-size: 0.85rem; padding: 0.45rem 0.9rem;" onclick="App.openSessionRosterModal()">
+                  👥 View Live Roster
+                </button>
+                <button type="button" class="btn-secondary" style="font-size: 0.85rem; padding: 0.45rem 0.9rem;" onclick="App.finalizeUnrecordedAttendance()">
+                  Mark Unrecorded Absent
+                </button>
+                <button type="button" class="btn-danger" id="btnCloseAttSessionBtn" style="font-size: 0.85rem; padding: 0.45rem 0.9rem;" onclick="App.closeCurrentAttendanceSession()">
+                  ⏹ Close Session
+                </button>
+              </div>
+            </div>
+            <p id="facActiveSessionDesc" style="margin-bottom: 0.5rem; font-size: 0.88rem; color: var(--text-secondary);">
+              Students are currently checking in via Web Bluetooth Beacon or Portal check-in.
+            </p>
+          </div>
+
+          <!-- Attendance Filters Bar -->
+          <div class="attendance-filters-bar">
+            <div class="attendance-filter-item">
+              <label for="attFilterSubject">Subject</label>
+              <select id="attFilterSubject" class="filter-select" onchange="App.applyAttendanceFilters()">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+            <div class="attendance-filter-item">
+              <label for="attFilterStatus">Status</label>
+              <select id="attFilterStatus" class="filter-select" onchange="App.applyAttendanceFilters()">
+                <option value="">All Statuses</option>
+                <option value="PRESENT">Present</option>
+                <option value="ABSENT">Absent</option>
+                <option value="EXCUSED">Excused</option>
+              </select>
+            </div>
+            <div class="attendance-filter-item">
+              <label for="attFilterDate">Date</label>
+              <input type="date" id="attFilterDate" class="form-input" onchange="App.applyAttendanceFilters()">
+            </div>
+            <div class="attendance-filter-item filter-search-item">
+              <label for="attSearchInput">Search Student / Class</label>
+              <input type="text" id="attSearchInput" class="form-input" placeholder="Type student, email or class..." oninput="App.applyAttendanceFilters()">
+            </div>
+            <div class="attendance-filter-actions">
+              <button type="button" class="btn-secondary btn-reset-attendance-filters" onclick="App.resetAttendanceFilters()">
+                Reset Filters
               </button>
             </div>
-            <p id="facActiveSessionDesc" style="margin-bottom: 1rem;">Students are currently able to submit attendance for this class.</p>
           </div>
 
           <!-- Attendance Records Table -->
           <div class="content-card">
             <div class="card-title-bar">
               <h3 id="attendanceTableHeading">Attendance Records Log</h3>
-              <div id="attendanceTableControls"></div>
+              <div id="attendanceTableControls" style="font-size: 0.82rem; color: var(--text-secondary);"></div>
             </div>
             <div class="table-responsive">
               <table class="data-table">
@@ -629,13 +921,14 @@
                     <th>Subject</th>
                     <th>Student / Batch</th>
                     <th>Status</th>
+                    <th>Method</th>
                     <th>Marked By</th>
                     <th>Timestamp</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="attendanceTableBody">
-                  <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading attendance records...</td></tr>
+                  <tr><td colspan="8" style="text-align: center; padding: 2rem;">Loading attendance records...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -762,12 +1055,79 @@
         <!-- TAB 7: FAST SESSION LOGGER (<60s Faculty)  -->
         <!-- ========================================== -->
         <section id="view-logger" class="tab-view-content" style="display: none;">
-          <div class="content-page-header">
-            <div>
-              <h2>Fast Session Logger (&lt;60s Workflow)</h2>
-              <p>Rapidly record class delivery, topic progress %, classwork, homework, and stopwatch time.</p>
+          <!-- Welcome Greeting Banner (Faculty Portal Phase 5A) -->
+          <div class="portal-welcome-card morning" id="facultyWelcomeCard">
+            <div class="welcome-bg-artwork" aria-hidden="true"></div>
+            <div class="welcome-text-col">
+              <div class="welcome-pill-row">
+                <span class="welcome-meta-pill">👨‍🏫 FACULTY INSTRUCTION</span>
+                <span class="welcome-meta-pill">LESSON PACING & LOGS</span>
+              </div>
+              <div class="welcome-greeting-title">
+                <span id="facultyGreetingEmoji" class="greeting-emoji">☀️</span>
+                <h2 id="facultyWelcomeGreeting" class="welcome-heading">Good Morning, Faculty</h2>
+              </div>
+              <p id="facultyWelcomeSubtitle" class="welcome-subtitle">
+                Welcome back, Faculty • Rapidly record class delivery, topic progress %, classwork, homework, and session stopwatch time in under 60 seconds.
+              </p>
             </div>
           </div>
+
+          <!-- Faculty Quick-Access Cards -->
+          <div class="quick-access-grid">
+            <div class="quick-access-card" onclick="App.openInstantSubjectLogger()" title="Instant Session Logger (<60s)">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Fast Logger</div>
+                <div class="quick-access-desc">Record Class in &lt;60s</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.openStartAttendanceModal()" title="Start Live Class Attendance Session">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Class Attendance</div>
+                <div class="quick-access-desc">Start BLE / Web Check-In</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('calendar')" title="View My Weekly Teaching Schedule">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Teaching Schedule</div>
+                <div class="quick-access-desc">Weekly Timetable Slots</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('history')" title="View Teaching Session History">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 8 14"></polyline></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Session History</div>
+                <div class="quick-access-desc">Delivered Classes & Topics</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+
           <div id="loggerTodaySlotsContainer">
             <!-- Populated dynamically -->
           </div>
@@ -809,12 +1169,79 @@
         <!-- TAB 9: STUDENT PORTAL VIEW                 -->
         <!-- ========================================== -->
         <section id="view-student" class="tab-view-content" style="display: none;">
-          <div class="content-page-header">
-            <div>
-              <h2>My Enrolled Subjects & Progression</h2>
-              <p>Your personalized syllabus completion status, delivered hours, and study materials.</p>
+          <!-- Welcome Greeting Banner (Student Portal Phase 4A) -->
+          <div class="portal-welcome-card morning" id="studentWelcomeCard">
+            <div class="welcome-bg-artwork" aria-hidden="true"></div>
+            <div class="welcome-text-col">
+              <div class="welcome-pill-row">
+                <span class="welcome-meta-pill">🎓 MIRAI BATCH 2026</span>
+                <span class="welcome-meta-pill">ACADEMIC RECORD</span>
+              </div>
+              <div class="welcome-greeting-title">
+                <span id="studentGreetingEmoji" class="greeting-emoji">☀️</span>
+                <h2 id="studentWelcomeGreeting" class="welcome-heading">Good Morning, Student</h2>
+              </div>
+              <p id="studentWelcomeSubtitle" class="welcome-subtitle">
+                Welcome back, Student • Personalized syllabus completion status, delivered hours, and study materials.
+              </p>
             </div>
           </div>
+
+          <!-- Student Quick-Access Cards -->
+          <div class="quick-access-grid">
+            <div class="quick-access-card" onclick="App.switchTab('calendar')" title="View My Weekly Class Timetable">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">My Timetable</div>
+                <div class="quick-access-desc">Class Schedule & Rooms</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('attendance')" title="Check In & View Attendance Records">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Attendance</div>
+                <div class="quick-access-desc">Rate & Session Check-In</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('exams')" title="View Exam Readiness Windows">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">Exam Readiness</div>
+                <div class="quick-access-desc">Coverage by Exam Window</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+
+            <div class="quick-access-card" onclick="App.switchTab('ai')" title="Ask AI Study Assistant">
+              <div class="quick-access-icon-wrapper">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path></svg>
+              </div>
+              <div class="quick-access-content">
+                <div class="quick-access-title">AI Study Assistant</div>
+                <div class="quick-access-desc">Ask Questions & MCQs</div>
+              </div>
+              <div class="quick-access-arrow">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
+            </div>
+          </div>
+
           <div id="studentSubjectsContainer" style="display: flex; flex-direction: column; gap: 1.5rem;">
             <!-- Populated dynamically -->
           </div>
@@ -832,6 +1259,96 @@
           </div>
           <div id="examWindowsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
             <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 11: AI ACADEMIC ASSISTANT (Phase 1)    -->
+        <!-- ========================================== -->
+        <section id="view-ai" class="tab-view-content" style="display: none;">
+          <div class="content-page-header">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <h2>🤖 AI Academic Assistant</h2>
+                <span id="aiModelStatusBadge" class="status-pill ontrack" style="font-size: 0.75rem;">AI Ready</span>
+              </div>
+              <p id="aiSubtitle">Intelligent pedagogical assistance for study notes, lesson plans, concept clarification, and revision MCQs.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;" onclick="App.clearAIChat()">
+                🗑️ Clear Chat
+              </button>
+            </div>
+          </div>
+
+          <!-- Configuration Notice (Displayed if API Key is not set) -->
+          <div id="aiConfigWarning" class="content-card" style="display: none; border-left: 4px solid #F59E0B; margin-bottom: 1.25rem; background-color: var(--surface-soft);">
+            <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+              <span style="font-size: 1.5rem;">⚙️</span>
+              <div>
+                <strong style="color: var(--heading-deep-blue); font-size: 0.95rem;">AI Assistant Ready for Configuration</strong>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
+                  The AI Assistant backend is active. To enable live answers with Google Gemini or OpenAI, set your <code style="background: var(--surface-card); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid var(--borders);">AI_API_KEY</code> in your local <code style="background: var(--surface-card); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid var(--borders);">.env</code> file and restart the server.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Suggestion Chips -->
+          <div style="margin-bottom: 1.25rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+              💡 Quick Prompts (Click to Ask)
+            </div>
+            <div id="aiSuggestionChips" class="ai-chips-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <!-- Populated dynamically based on user role -->
+            </div>
+          </div>
+
+          <!-- Main Chat Card -->
+          <div class="content-card ai-chat-card" style="display: flex; flex-direction: column; height: calc(100vh - 340px); min-height: 480px; padding: 0; overflow: hidden;">
+            <!-- Message History Container -->
+            <div id="aiChatMessages" class="ai-messages-window" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+              <!-- Welcome Message from Assistant -->
+              <div class="ai-msg ai-msg-bot">
+                <div class="ai-msg-avatar">🤖</div>
+                <div class="ai-msg-body">
+                  <div class="ai-msg-header">
+                    <strong>EDVANTA AI Academic Assistant</strong>
+                    <span class="ai-msg-time">Just now</span>
+                  </div>
+                  <div class="ai-msg-content" id="aiWelcomeMessageText">
+                    Hello! I am your EDVANTA AI Academic Assistant for MSOT. How can I help you today?
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="aiTypingIndicator" class="ai-typing-bar" style="display: none; padding: 0.5rem 1.5rem; font-size: 0.82rem; color: var(--primary-blue); background: var(--surface-soft); border-top: 1px solid var(--borders-subtle); align-items: center; gap: 0.5rem;">
+              <span>⏳</span>
+              <span>EDVANTA AI is thinking...</span>
+            </div>
+
+            <!-- Chat Input Area -->
+            <form id="aiChatForm" onsubmit="event.preventDefault(); App.sendAIMessage();" style="border-top: 1px solid var(--borders); padding: 1rem; background-color: var(--surface-soft); display: flex; gap: 0.75rem; align-items: flex-end;">
+              <div style="flex: 1; position: relative;">
+                <textarea
+                  id="aiPromptInput"
+                  class="form-input"
+                  rows="2"
+                  placeholder="Ask an academic question, request revision MCQs, or ask for a lesson plan summary... (Press Enter to send)"
+                  style="resize: none; width: 100%; font-family: inherit; font-size: 0.9rem; padding: 0.75rem; border-radius: var(--radius-md);"
+                  onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); App.sendAIMessage(); }"
+                ></textarea>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 0.25rem;">
+                  <span id="aiCharCount">0</span>/2500 characters • Shift+Enter for new line
+                </div>
+              </div>
+              <button type="submit" id="btnSendAI" class="btn-primary" style="padding: 0.75rem 1.25rem; font-size: 0.95rem; height: 50px; display: flex; align-items: center; gap: 0.4rem;">
+                <span>Send</span>
+                <span>→</span>
+              </button>
+            </form>
           </div>
         </section>
 
@@ -865,11 +1382,64 @@
             <option value="camp_ratnam">Rathinam Campus</option>
           </select>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="attModalValidity">Session Validity Period:</label>
+          <select id="attModalValidity" class="form-select">
+            <option value="15" selected>15 minutes (Standard Lecture)</option>
+            <option value="30">30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes (Extended Lab / Workshop)</option>
+          </select>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); background: var(--surface-soft); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--borders); margin-top: 0.5rem; line-height: 1.4;">
+          📡 <strong>Bluetooth Low Energy (BLE) Attendance:</strong> A unique session beacon code will be broadcasted. Compatible student devices can verify proximity using Web Bluetooth.
+        </div>
         <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
           <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('startAttendanceModal')">Cancel</button>
           <button type="submit" class="btn-primary" style="flex: 2;">Start Session Now</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: LIVE SESSION ROSTER & MANUAL ATTENDANCE -->
+  <!-- ========================================== -->
+  <div id="sessionRosterModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 820px; width: 95%;">
+      <div class="modal-header">
+        <div class="modal-title">👥 Class Session Attendance Roster</div>
+        <button class="btn-close" onclick="App.closeModal('sessionRosterModal')">&times;</button>
+      </div>
+      <div id="sessionRosterSummaryBar" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--surface-soft); border-radius: var(--radius-md); font-size: 0.85rem; border: 1px solid var(--borders); align-items: center; justify-content: space-between;">
+        <div id="rosterStatsPill" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+      <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Student Name</th>
+              <th>Status</th>
+              <th>Method</th>
+              <th>Timestamp</th>
+              <th>Manual Action</th>
+            </tr>
+          </thead>
+          <tbody id="sessionRosterTableBody">
+            <tr><td colspan="5" style="text-align: center; padding: 2rem;">Loading session roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <button type="button" class="btn-secondary" style="font-size: 0.85rem;" onclick="App.finalizeUnrecordedAttendance()">
+          Mark All Remaining Unrecorded as ABSENT
+        </button>
+        <button type="button" class="btn-primary" style="font-size: 0.85rem;" onclick="App.closeModal('sessionRosterModal')">
+          Done
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1001,6 +1571,164 @@
           <button type="submit" class="btn-primary" style="flex: 2;">Update Password</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: TELEGRAM BOT ACCOUNT LINKING (Phase 2) -->
+  <!-- ========================================== -->
+  <div id="telegramModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title">✈️ Telegram Academic Bot</div>
+        <button class="btn-close" onclick="App.closeModal('telegramModal')">&times;</button>
+      </div>
+      <div style="padding: 0.25rem 0 1rem 0;">
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 1rem;">
+          Connect your Telegram account to check your syllabus progression, timetable schedule, and attendance via Telegram.
+        </p>
+
+        <!-- Unlinked State Container -->
+        <div id="tgUnlinkedView" style="display: block;">
+          <div style="background: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--heading-deep-blue);">One-Time Linking Code</span>
+              <span id="tgTimerBadge" class="status-pill tight" style="display: none; font-size: 0.75rem;">Expires in 10:00</span>
+            </div>
+            <div id="tgCodeDisplayArea" style="text-align: center; padding: 1rem; background: var(--surface-card); border: 2px dashed var(--borders); border-radius: 8px;">
+              <div id="tgCodeText" style="font-size: 1.6rem; font-weight: 800; letter-spacing: 0.15em; color: var(--primary-blue); font-family: 'JetBrains Mono', monospace;">
+                --------
+              </div>
+              <div id="tgCodeInstruction" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem;">
+                Click below to generate a secure 10-minute code
+              </div>
+            </div>
+          </div>
+
+          <div style="background: var(--surface-soft); border-left: 4px solid var(--primary-blue); padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--text-dark);">
+            <strong>How to link:</strong><br>
+            1. Generate your one-time code above.<br>
+            2. Open Telegram and search for <strong id="tgBotHandle">@EdvantaBot</strong>.<br>
+            3. Send message: <code style="background: var(--surface-card); padding: 0.1rem 0.3rem; border-radius: 3px; border: 1px solid var(--borders);">/link &lt;CODE&gt;</code>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('telegramModal')">Close</button>
+            <button type="button" id="btnGenerateTgCode" class="btn-primary" style="flex: 2;" onclick="App.generateTelegramCode()">
+              🔑 Generate Linking Code
+            </button>
+          </div>
+        </div>
+
+        <!-- Linked State Container -->
+        <div id="tgLinkedView" style="display: none;">
+          <div style="background: var(--surface-soft); border: 1px solid #10B981; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem; text-align: center;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">✅</div>
+            <div style="font-weight: 800; font-size: 1.1rem; color: var(--heading-deep-blue);">Telegram Account Linked</div>
+            <div id="tgLinkedDetails" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.4;">
+              Connected to Telegram
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('telegramModal')">Close</button>
+            <button type="button" class="btn-secondary" style="flex: 1; color: var(--accent-red); border-color: var(--accent-red);" onclick="App.unlinkTelegramAccount()">
+              🔓 Unlink Telegram
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: WHATSAPP BUSINESS PLATFORM (Phase 3) -->
+  <!-- ========================================== -->
+  <div id="whatsappModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title">💬 WhatsApp Academic Alerts</div>
+        <button class="btn-close" onclick="App.closeModal('whatsappModal')">&times;</button>
+      </div>
+      <div style="padding: 0.25rem 0 1rem 0;">
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 1rem;">
+          Receive verified EDVANTA academic notifications directly on WhatsApp: attendance notices, timetable reminders, and curriculum pacing alerts.
+        </p>
+
+        <!-- Unlinked View: Phone Input & Verification Code -->
+        <div id="waUnlinkedView" style="display: block;">
+          <div style="background: var(--surface-soft); border: 1px solid var(--borders); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label class="form-label" for="waPhoneInput">Mobile Phone Number (WhatsApp):</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <input type="tel" id="waPhoneInput" class="form-input" placeholder="+91 98765 43210" style="flex: 1;" />
+                <button type="button" id="btnWaSendCode" class="btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1rem;" onclick="App.requestWhatsAppCode()">
+                  Send Code
+                </button>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+                Enter 10-digit number or international format with country code (e.g., +91).
+              </div>
+            </div>
+
+            <!-- OTP Input Section (Hidden initially, shown after code is sent) -->
+            <div id="waOtpSection" style="display: none; border-top: 1px dashed var(--borders); padding-top: 1rem; margin-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <label class="form-label" for="waCodeInput" style="margin: 0;">6-Digit Verification Code:</label>
+                <span id="waTimerBadge" class="status-pill tight" style="font-size: 0.72rem;">Valid for 10:00</span>
+              </div>
+              <input type="text" id="waCodeInput" class="form-input" placeholder="123456" maxlength="6" style="letter-spacing: 0.25em; font-weight: 700; text-align: center; font-size: 1.25rem; font-family: monospace;" />
+              <button type="button" id="btnWaVerify" class="btn-primary" style="width: 100%; margin-top: 0.75rem;" onclick="App.verifyWhatsAppCode()">
+                ✅ Verify & Link WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linked View: Active Status & Notification Preferences -->
+        <div id="waLinkedView" style="display: none;">
+          <div style="background: var(--surface-soft); border: 1px solid #10B981; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <span style="font-size: 1.75rem;">✅</span>
+              <div>
+                <div style="font-weight: 800; font-size: 1rem; color: var(--heading-deep-blue);">WhatsApp Connected</div>
+                <div id="waLinkedNumber" style="font-size: 0.85rem; color: var(--text-secondary); font-family: monospace;">+91 ••••• ••000</div>
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--borders); padding-top: 0.75rem; margin-top: 0.75rem;">
+              <div style="font-weight: 700; font-size: 0.82rem; color: var(--heading-deep-blue); margin-bottom: 0.5rem; text-transform: uppercase;">
+                Notification Preferences:
+              </div>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-bottom: 0.4rem; cursor: pointer;">
+                <input type="checkbox" id="waPrefMaster" onchange="App.saveWhatsAppPreferences()" />
+                <span>Enable WhatsApp Academic Notifications</span>
+              </label>
+              <div style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; color: var(--text-secondary);">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="waPrefAttendance" onchange="App.saveWhatsAppPreferences()" />
+                  <span>Attendance & Missed Session Alerts</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="waPrefSchedule" onchange="App.saveWhatsAppPreferences()" />
+                  <span>Daily Timetable Reminders</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="waPrefProgress" onchange="App.saveWhatsAppPreferences()" />
+                  <span>Curriculum Pacing & Exam Milestones</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.closeModal('whatsappModal')">Close</button>
+            <button type="button" class="btn-secondary" style="flex: 1; color: var(--accent-red); border-color: var(--accent-red);" onclick="App.unlinkWhatsAppAccount()">
+              🔓 Unlink WhatsApp
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1177,6 +1905,307 @@
         <button type="button" class="btn-primary" style="flex: 2; justify-content: center;" onclick="App.submitAddHoliday()">
           Confirm & Recalculate Timeline
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: EXPLORE FEATURES                    -->
+  <!-- ========================================== -->
+  <div id="exploreFeaturesModal" class="modal-overlay" onclick="App.handleBackdropClick(event, 'exploreFeaturesModal')">
+    <div class="modal-content explore-features-modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <span class="academic-preview-eyebrow" style="color: #2563EB; font-weight: 800; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;">DISCOVER EDVANTA</span>
+          <h2 class="modal-title" style="font-size: 1.5rem; color: #0F172A; font-weight: 800; margin-top: 0.2rem; margin-bottom: 0.25rem;">Everything in its place.</h2>
+          <p style="font-size: 0.9rem; color: #64748B; margin: 0;">"Your academic essentials, thoughtfully connected."</p>
+        </div>
+        <button class="btn-close" onclick="App.closeModal('exploreFeaturesModal')" aria-label="Close Modal">&times;</button>
+      </div>
+
+      <div class="features-modal-grid">
+        <!-- Card 1: Academic Progression -->
+        <div class="feature-pastel-card card-progression" onclick="App.handleFeatureCardClick('curriculum')">
+          <div class="feature-pastel-icon-row">
+            <svg class="feature-icon-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18"/>
+              <path d="M19 9l-5 5-3-3-4 4"/>
+              <circle cx="19" cy="9" r="1.5" fill="#2563EB"/>
+            </svg>
+          </div>
+          <div class="feature-pastel-title">Academic Progression</div>
+          <div class="feature-pastel-desc">Track syllabus completion and teaching progress.</div>
+          <div class="feature-pastel-footer">
+            <span>Explore Progression</span>
+            <span class="pastel-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Timetable -->
+        <div class="feature-pastel-card card-timetable" onclick="App.handleFeatureCardClick('calendar')">
+          <div class="feature-pastel-icon-row">
+            <svg class="feature-icon-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="3" ry="3"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div class="feature-pastel-title">Timetable</div>
+          <div class="feature-pastel-desc">Keep every class and schedule in view.</div>
+          <div class="feature-pastel-footer">
+            <span>View Schedules</span>
+            <span class="pastel-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Attendance Report -->
+        <div class="feature-pastel-card card-attendance" onclick="App.handleFeatureCardClick('attendance')">
+          <div class="feature-pastel-icon-row">
+            <svg class="feature-icon-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="feature-pastel-title">Attendance Report</div>
+          <div class="feature-pastel-desc">Review attendance across sessions.</div>
+          <div class="feature-pastel-footer">
+            <span>Review Attendance</span>
+            <span class="pastel-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Insights -->
+        <div class="feature-pastel-card card-insights" onclick="App.handleFeatureCardClick('dashboard')">
+          <div class="feature-pastel-icon-row">
+            <svg class="feature-icon-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#EA580C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              <circle cx="12" cy="12" r="3" fill="#EA580C"/>
+            </svg>
+          </div>
+          <div class="feature-pastel-title">Insights</div>
+          <div class="feature-pastel-desc">See trends, risks and recommendations.</div>
+          <div class="feature-pastel-footer">
+            <span>Explore Trends</span>
+            <span class="pastel-arrow">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: AUTHENTICATION (Login & Get Started) -->
+  <!-- ========================================== -->
+  <div id="authModal" class="modal-overlay" onclick="App.handleBackdropClick(event, 'authModal')">
+    <div class="modal-content auth-modal-content" onclick="event.stopPropagation()">
+      <button class="btn-close auth-modal-close" onclick="App.closeModal('authModal')" aria-label="Close Authentication Modal">&times;</button>
+
+      <div class="auth-modal-header">
+        <div class="brand-logo-container" style="justify-content: center; margin-bottom: 0.5rem;">
+          <svg class="edvanta-logo-svg" viewBox="0 0 44 44" fill="none" style="width: 38px; height: 38px;">
+            <path d="M22 4L4 13.5L22 23L40 13.5L22 4Z" fill="url(#capGradAuth)" stroke="#60A5FA" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M38 14V26" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="38" cy="27.5" r="1.8" fill="#F59E0B"/>
+            <path d="M13 20H31V24H18.5V27.5H28.5V31.5H18.5V35H31V39H13V20Z" fill="url(#capGradAuth)"/>
+            <defs>
+              <linearGradient id="capGradAuth" x1="4" y1="4" x2="40" y2="39" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3B82F6"/>
+                <stop offset="1" stop-color="#1D4ED8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="brand-wordmark" style="font-size: 1.4rem; color: var(--heading-deep-blue); font-weight: 800; letter-spacing: 0.04em;">EDVANTA</span>
+        </div>
+        <h2 class="auth-modal-title">Welcome to EDVANTA</h2>
+        <p class="auth-modal-subtitle">Sign in to your Mirai School of Technology portal.</p>
+      </div>
+
+      <!-- Google OAuth Button -->
+      <button type="button" class="btn-google-oauth" onclick="App.handleGoogleOAuthClick()">
+        <svg class="google-logo-svg" viewBox="0 0 24 24" width="20" height="20">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.27 21.43 7.35 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.13z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.57 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider">
+        <span>OR CONTINUE WITH PHONE</span>
+      </div>
+
+      <!-- Auth Navigation Tabs: Phone OTP / Password / 1-Click Demo -->
+      <div class="auth-nav-tabs">
+        <button type="button" class="auth-tab-btn active" id="tabBtnPhoneAuth" onclick="App.switchAuthTab('phone')">📱 Phone</button>
+        <button type="button" class="auth-tab-btn" id="tabBtnPasswordAuth" onclick="App.switchAuthTab('password')">🔑 Password</button>
+        <button type="button" class="auth-tab-btn" id="tabBtnDemoAuth" onclick="App.switchAuthTab('demo')">⚡ 1-Click Demo</button>
+      </div>
+
+      <!-- Notice & Error Banners in Auth Modal -->
+      <div id="authNoticeBanner" class="login-notice-banner" style="display: none; margin: 0.75rem 0;">
+        <span>ℹ️</span>
+        <span id="authNoticeMsg"></span>
+      </div>
+      <div id="authErrorBanner" class="login-error-banner" style="display: none; margin: 0.75rem 0;">
+        <span>⚠️</span>
+        <span id="authErrorMsg"></span>
+      </div>
+
+      <!-- TAB 1: PHONE NUMBER & OTP -->
+      <div id="authTabPhone" class="auth-tab-content">
+        <div id="phoneInputStep">
+          <div class="form-group">
+            <label class="form-label" for="authCountryCode">Country / Region Code:</label>
+            <div class="country-phone-row">
+              <select id="authCountryCode" class="form-select country-select" aria-label="Country Code">
+                <option value="+91" selected>🇮🇳 India (+91)</option>
+                <option value="+1">🇺🇸 USA (+1)</option>
+                <option value="+44">🇬🇧 UK (+44)</option>
+                <option value="+971">🇦🇪 UAE (+971)</option>
+                <option value="+65">🇸🇬 Singapore (+65)</option>
+                <option value="+1">🇨🇦 Canada (+1)</option>
+                <option value="+61">🇦🇺 Australia (+61)</option>
+                <option value="+49">🇩🇪 Germany (+49)</option>
+              </select>
+              <input type="tel" id="authPhoneNumber" class="form-input" placeholder="e.g. 9876543220" autocomplete="tel">
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; display: block;">
+              Enter 10-digit mobile number registered with MSOT.
+            </span>
+          </div>
+          <button type="button" id="btnContinuePhone" class="btn-primary" style="width: 100%; padding: 0.8rem;" onclick="App.handleSendPhoneOTP()">
+            Continue with Phone →
+          </button>
+        </div>
+
+        <!-- Phone OTP Verification Step -->
+        <div id="phoneOtpStep" style="display: none;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            Verification code requested for <strong id="displayOtpTargetPhone">+91 ...</strong>:
+          </p>
+          <div class="form-group">
+            <input type="text" id="authOtpCode" class="form-input" placeholder="Enter 6-digit code" maxlength="8" style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; letter-spacing: 0.2em; text-align: center;">
+          </div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <button type="button" class="btn-secondary" style="flex: 1;" onclick="App.cancelOtpStep()">Back</button>
+            <button type="button" class="btn-primary" style="flex: 2;" onclick="App.handleVerifyPhoneOTP()">Verify & Enter Portal →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: EMAIL / PHONE + PASSWORD LOGIN -->
+      <div id="authTabPassword" class="auth-tab-content" style="display: none;">
+        <form onsubmit="event.preventDefault(); App.handleModalPasswordLogin();">
+          <div class="form-group">
+            <label class="form-label" for="modalLoginIdentifier">Registered Email or Phone:</label>
+            <input type="text" id="modalLoginIdentifier" class="form-input" placeholder="faculty.cs@edvanta.msot.edu or 9876543220" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+              <label class="form-label" for="modalLoginPassword" style="margin: 0;">Password:</label>
+              <button type="button" class="btn-secondary" style="font-size: 0.7rem; padding: 0.1rem 0.4rem; border: none;" onclick="App.togglePasswordVisibility('modalLoginPassword')">👁️ Show/Hide</button>
+            </div>
+            <input type="password" id="modalLoginPassword" class="form-input" placeholder="Enter password (default: edvanta123)" required autocomplete="current-password">
+          </div>
+          <button type="submit" id="btnModalPasswordSubmit" class="btn-primary" style="width: 100%; padding: 0.8rem; margin-top: 0.5rem;">
+            Sign In to Portal →
+          </button>
+        </form>
+      </div>
+
+      <!-- TAB 3: 1-CLICK DEMO ACCOUNTS -->
+      <div id="authTabDemo" class="auth-tab-content" style="display: none;">
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Click any verified account below for instant 1-click evaluator sign in:
+        </p>
+        <div class="demo-acc-list">
+          <div class="demo-acc-row" onclick="App.fillAndLoginDemo('admin@edvanta.msot.edu', 'edvanta123', 'ADMIN')">
+            <div>
+              <div style="font-weight: 700; color: var(--heading-deep-blue); font-size: 0.9rem;">👑 Dean Prof. Rajesh Sharma</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Admin Portal • admin@edvanta.msot.edu</div>
+            </div>
+            <button type="button" class="demo-fill-btn">Sign In →</button>
+          </div>
+          <div class="demo-acc-row" onclick="App.fillAndLoginDemo('faculty.cs@edvanta.msot.edu', 'edvanta123', 'FACULTY')">
+            <div>
+              <div style="font-weight: 700; color: var(--heading-deep-blue); font-size: 0.9rem;">👨‍🏫 Dr. Aris Thorne (CS)</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Faculty Portal • faculty.cs@edvanta.msot.edu</div>
+            </div>
+            <button type="button" class="demo-fill-btn">Sign In →</button>
+          </div>
+          <div class="demo-acc-row" onclick="App.fillAndLoginDemo('student.aarav@edvanta.msot.edu', 'edvanta123', 'STUDENT')">
+            <div>
+              <div style="font-weight: 700; color: var(--heading-deep-blue); font-size: 0.9rem;">🎓 Aarav Mehta (Mirai Batch)</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Student Portal • student.aarav@edvanta.msot.edu</div>
+            </div>
+            <button type="button" class="demo-fill-btn">Sign In →</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 0.85rem;">
+        <a href="#" onclick="event.preventDefault(); App.closeModal('authModal'); App.showLoginView();" style="font-size: 0.82rem; color: var(--primary-blue); font-weight: 600; text-decoration: underline;">
+          Switch to 3-Portal Selection View →
+        </a>
+      </div>
+
+      <!-- Security Notice -->
+      <div class="login-preview-footer-notice" style="margin-top: 1rem;">
+        <span class="lock-icon">🔒</span>
+        <span>Only authorized Mirai users can access the platform.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ABOUT EDVANTA & MSOT                -->
+  <!-- ========================================== -->
+  <div id="aboutModal" class="modal-overlay" onclick="App.handleBackdropClick(event, 'aboutModal')">
+    <div class="modal-content" style="max-width: 580px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">🏛️ About EDVANTA & MSOT</div>
+        <button class="btn-close" onclick="App.closeModal('aboutModal')">&times;</button>
+      </div>
+      <div style="padding: 1rem 0; font-size: 0.92rem; color: var(--text-main); line-height: 1.6;">
+        <p style="margin-bottom: 0.85rem;">
+          <strong>EDVANTA</strong> is the comprehensive academic progression tracker designed exclusively for the <strong>Mirai School of Technology (MSOT)</strong>.
+        </p>
+        <p style="margin-bottom: 0.85rem;">
+          Our platform unifies course progression, syllabus pacing, and exam readiness across all three regional campuses: <strong>HI-Tech</strong>, <strong>Jagannath</strong>, and <strong>Rathinam</strong>.
+        </p>
+        <p style="margin-bottom: 0;">
+          With the founding motto <em>"Every hour counts, every goal matters"</em>, EDVANTA empowers MSOT faculty and students with real-time curriculum intelligence, verified attendance workflows, and predictive academic readiness.
+        </p>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+        <button type="button" class="btn-primary" onclick="App.closeModal('aboutModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CONTACT & SUPPORT                   -->
+  <!-- ========================================== -->
+  <div id="contactModal" class="modal-overlay" onclick="App.handleBackdropClick(event, 'contactModal')">
+    <div class="modal-content" style="max-width: 540px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">📞 Academic Administration & Support</div>
+        <button class="btn-close" onclick="App.closeModal('contactModal')">&times;</button>
+      </div>
+      <div style="padding: 1rem 0; font-size: 0.9rem; color: var(--text-main); line-height: 1.6;">
+        <p style="margin-bottom: 0.75rem;">For curriculum schedules, batch enrollments, or technical assistance:</p>
+        <div style="background-color: var(--surface-soft); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--borders); display: flex; flex-direction: column; gap: 0.5rem;">
+          <div>📧 <strong>Academic Dean Office:</strong> dean.academic@edvanta.msot.edu</div>
+          <div>💻 <strong>Platform Tech Support:</strong> support@edvanta.msot.edu</div>
+          <div>🏛️ <strong>Campuses:</strong> HI-Tech Campus, Jagannath Campus, Rathinam Campus</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+        <button type="button" class="btn-primary" onclick="App.closeModal('contactModal')">Close</button>
       </div>
     </div>
   </div>

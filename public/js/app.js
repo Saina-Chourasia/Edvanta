@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     dashboardData: null,
     todaySessionsData: null,
     currentActiveAttendanceSessionId: null,
+    allAttendanceRecords: [],
+    attCountdownInterval: null,
     stopwatchInterval: null,
     stopwatchSeconds: 0,
     sidebarCollapsed: false,
@@ -32,26 +34,94 @@ document.addEventListener('DOMContentLoaded', async () => {
     async init() {
       console.log('🚀 Initializing EDVANTA MSOT Educational Platform...');
       this.bindEvents();
+      this.initGreetingTimer();
+
+      // Check URL query parameters for Google OAuth callback results or error notifications
+      const urlParams = new URLSearchParams(window.location.search);
+      const authError = urlParams.get('auth_error');
+      const authSuccess = urlParams.get('auth_success');
+      const authEmail = urlParams.get('email');
+
+      if (authError) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        let errorMsg = 'Google authentication could not be completed.';
+        if (authError === 'google_unconfigured') {
+          errorMsg = 'Google OAuth credentials are not configured on this server. To enable real Google Sign-In, please set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_CALLBACK_URL in your server .env file.';
+        } else if (authError === 'unauthorized_account') {
+          errorMsg = `Unauthorized Google Account: The email "${authEmail || 'entered'}" is not registered in the MSOT academic database. Only authorized Mirai School of Technology students and faculty may sign in. (To authorize this Google account, register this email address in MSOT or set GOOGLE_ALLOWED_EMAIL in your .env file).`;
+        } else if (authError === 'invalid_state') {
+          errorMsg = 'Authentication security check failed: Invalid or expired state token. Please try signing in with Google again.';
+        } else if (authError === 'google_access_denied') {
+          errorMsg = 'Google sign-in was cancelled by the user.';
+        } else if (authError === 'unverified_google_email') {
+          errorMsg = 'The provided Google account email address is not verified by Google.';
+        } else if (authError === 'token_exchange_failed') {
+          errorMsg = 'Failed to exchange authorization credentials with Google. Please check your network and Google OAuth settings.';
+        } else {
+          errorMsg = `Google sign-in error: ${authError}.`;
+        }
+
+        this.openAuthModal();
+        const errBanner = document.getElementById('authErrorBanner');
+        const errMsg = document.getElementById('authErrorMsg');
+        if (errBanner && errMsg) {
+          errMsg.textContent = errorMsg;
+          errBanner.style.display = 'flex';
+        }
+        this.showToast(errorMsg, 'error');
+        return;
+      }
+
+      if (authSuccess === '1') {
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+          API.setToken(urlToken);
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+        const token = urlToken || API.getToken();
+        if (token) {
+          API.setToken(token);
+          try {
+            this.user = await API.getMe();
+            this.updateNavbarAuthStatus();
+            this.showToast(`Welcome to EDVANTA, ${this.user.name}! Authenticated via Google.`, 'success');
+            await this.onLoginSuccess();
+            return;
+          } catch (e) {
+            console.error('Failed to initialize session after Google login:', e);
+          }
+        }
+      }
 
       const token = API.getToken();
       if (token) {
         try {
           this.user = await API.getMe();
-          await this.onLoginSuccess();
+          this.updateNavbarAuthStatus();
+          const lastView = localStorage.getItem('edvanta_view');
+          if (lastView === 'landing') {
+            this.showLandingPage();
+          } else {
+            await this.onLoginSuccess();
+          }
         } catch (e) {
           console.warn('Session token expired or invalid:', e.message);
-          API.logout();
+          await API.logout();
+          this.user = null;
+          this.updateNavbarAuthStatus();
           this.showLandingPage();
         }
       } else {
-        // Requirement 2: Show Landing Page first when opening website
+        this.updateNavbarAuthStatus();
         this.showLandingPage();
       }
     },
 
-    // Show Public Landing Page
+    // Show Public Landing Page without losing authenticated state
     showLandingPage(event) {
       if (event) event.preventDefault();
+
+      localStorage.setItem('edvanta_view', 'landing');
 
       const landing = document.getElementById('landingView');
       const login = document.getElementById('loginView');
@@ -63,10 +133,310 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (shell) shell.style.display = 'none';
       if (publicNav) publicNav.style.display = 'block';
 
+      this.updateNavbarAuthStatus();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
+    // Smooth scroll down to MSOT Unified Campus Network section
+    scrollToCampuses(event) {
+      if (event) event.preventDefault();
+      const el = document.getElementById('landingCampuses');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    },
+
+    // Return to the authenticated user's active portal
+    async returnToPortal() {
+      if (!this.user) {
+        this.openAuthModal();
+        return;
+      }
+      localStorage.setItem('edvanta_view', 'portal');
+      await this.onLoginSuccess();
+    },
+
+    // Synchronize Top Navbar with current user session
+    updateNavbarAuthStatus() {
+      const authContainer = document.getElementById('navAuthenticatedContainer');
+      const unauthContainer = document.getElementById('navUnauthenticatedContainer');
+      const heroBtn = document.getElementById('btnHeroGetStarted');
+
+      if (this.user) {
+        if (authContainer) authContainer.style.display = 'flex';
+        if (unauthContainer) unauthContainer.style.display = 'none';
+        const avatarEl = document.getElementById('navUserAvatar');
+        const nameEl = document.getElementById('navUserName');
+        const badgeEl = document.getElementById('navRoleBadge');
+        if (avatarEl) avatarEl.textContent = (this.user.name || this.user.role || 'U').charAt(0).toUpperCase();
+        if (nameEl) nameEl.textContent = this.user.name || this.user.email;
+        if (badgeEl) badgeEl.textContent = this.user.role;
+        if (heroBtn) heroBtn.textContent = 'Enter Portal →';
+      } else {
+        if (authContainer) authContainer.style.display = 'none';
+        if (unauthContainer) unauthContainer.style.display = 'block';
+        if (heroBtn) heroBtn.textContent = 'Get Started →';
+      }
+    },
+
+    // Hero Get Started action
+    handleHeroGetStarted() {
+      if (this.user) {
+        this.returnToPortal();
+      } else {
+        this.openAuthModal();
+      }
+    },
+
+    // Modal Exclusivity & Control
+    openModal(modalId) {
+      const allModals = ['exploreFeaturesModal', 'authModal', 'aboutModal', 'contactModal', 'studentTopicsModal', 'addHolidayModal', 'telegramModal', 'whatsappModal', 'changePasswordModal', 'aiModal'];
+      allModals.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+      const target = document.getElementById(modalId);
+      if (target) {
+        target.style.display = 'flex';
+      }
+    },
+
+    closeModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) el.style.display = 'none';
+    },
+
+    handleBackdropClick(event, modalId) {
+      if (event && event.target && event.target.id === modalId) {
+        this.closeModal(modalId);
+      }
+    },
+
+    openExploreFeaturesModal(event) {
+      if (event) event.preventDefault();
+      this.openModal('exploreFeaturesModal');
+    },
+
+    openAuthModal(event) {
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      this.openModal('authModal');
+      this.switchAuthTab('password');
+    },
+
+    openAboutModal(event) {
+      if (event) event.preventDefault();
+      this.openModal('aboutModal');
+    },
+
+    openContactModal(event) {
+      if (event) event.preventDefault();
+      this.openModal('contactModal');
+    },
+
+    switchAuthTab(tab) {
+      const phoneTab = document.getElementById('authTabPhone');
+      const passTab = document.getElementById('authTabPassword');
+      const demoTab = document.getElementById('authTabDemo');
+
+      const btnPhone = document.getElementById('tabBtnPhoneAuth');
+      const btnPass = document.getElementById('tabBtnPasswordAuth');
+      const btnDemo = document.getElementById('tabBtnDemoAuth');
+
+      if (phoneTab) phoneTab.style.display = tab === 'phone' ? 'block' : 'none';
+      if (passTab) passTab.style.display = tab === 'password' ? 'block' : 'none';
+      if (demoTab) demoTab.style.display = tab === 'demo' ? 'block' : 'none';
+
+      if (btnPhone) btnPhone.classList.toggle('active', tab === 'phone');
+      if (btnPass) btnPass.classList.toggle('active', tab === 'password');
+      if (btnDemo) btnDemo.classList.toggle('active', tab === 'demo');
+
+      const noticeBanner = document.getElementById('authNoticeBanner');
+      const errBanner = document.getElementById('authErrorBanner');
+      if (noticeBanner) noticeBanner.style.display = 'none';
+      if (errBanner) errBanner.style.display = 'none';
+    },
+
+    async handleGoogleOAuthClick() {
+      // Check status first to provide instant, friendly guidance if credentials are not configured yet
+      try {
+        const res = await fetch('/api/auth/google/status');
+        const status = await res.json();
+        if (!status.configured) {
+          const errBanner = document.getElementById('authErrorBanner') || document.getElementById('loginErrorBanner');
+          const errMsg = document.getElementById('authErrorMsg') || document.getElementById('loginErrorMessage');
+          const msg = 'Google Sign-In is awaiting your Google Cloud OAuth credentials. To enable real Google Sign-In, please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your server .env file.';
+          if (errBanner && errMsg) {
+            errMsg.textContent = msg;
+            errBanner.style.display = 'flex';
+          }
+          this.showToast('Google Sign-In requires GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET in .env', 'warning');
+          return;
+        }
+      } catch (e) {
+        // Fallback to direct redirect
+      }
+      // Redirect to backend OAuth initiation endpoint to start the official Google authentication flow
+      window.location.href = '/api/auth/google';
+    },
+
+    async handleSendPhoneOTP() {
+      const countryCode = document.getElementById('authCountryCode')?.value || '+91';
+      const rawPhone = (document.getElementById('authPhoneNumber')?.value || '').trim();
+      const errBanner = document.getElementById('authErrorBanner');
+      const errMsg = document.getElementById('authErrorMsg');
+      const noticeBanner = document.getElementById('authNoticeBanner');
+      const noticeMsg = document.getElementById('authNoticeMsg');
+      const btn = document.getElementById('btnContinuePhone');
+
+      if (errBanner) errBanner.style.display = 'none';
+      if (noticeBanner) noticeBanner.style.display = 'none';
+
+      if (!rawPhone || rawPhone.replace(/\D/g, '').length < 7) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = 'Please enter a valid phone number (at least 7 digits).';
+          errBanner.style.display = 'flex';
+        }
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Sending code...';
+      }
+
+      try {
+        const fullPhone = `${countryCode}${rawPhone.replace(/\D/g, '')}`;
+        const res = await API.sendPhoneOTP(fullPhone);
+        const targetEl = document.getElementById('displayOtpTargetPhone');
+        if (targetEl) targetEl.textContent = `${countryCode} ${res.phone}`;
+        const phoneInputStep = document.getElementById('phoneInputStep');
+        const phoneOtpStep = document.getElementById('phoneOtpStep');
+        if (phoneInputStep) phoneInputStep.style.display = 'none';
+        if (phoneOtpStep) phoneOtpStep.style.display = 'block';
+
+        if (noticeBanner && noticeMsg) {
+          noticeMsg.textContent = res.dev_code 
+            ? `${res.message} Your verification code is: ${res.dev_code}`
+            : res.message;
+          noticeBanner.style.display = 'flex';
+        }
+        this.showToast('Verification code generated!', 'success');
+      } catch (err) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = err.message || 'Failed to send verification code.';
+          errBanner.style.display = 'flex';
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Continue with Phone →';
+        }
+      }
+    },
+
+    cancelOtpStep() {
+      const phoneInputStep = document.getElementById('phoneInputStep');
+      const phoneOtpStep = document.getElementById('phoneOtpStep');
+      if (phoneInputStep) phoneInputStep.style.display = 'block';
+      if (phoneOtpStep) phoneOtpStep.style.display = 'none';
+    },
+
+    async handleVerifyPhoneOTP() {
+      const countryCode = document.getElementById('authCountryCode')?.value || '+91';
+      const rawPhone = (document.getElementById('authPhoneNumber')?.value || '').trim();
+      const fullPhone = `${countryCode}${rawPhone.replace(/\D/g, '')}`;
+      const code = (document.getElementById('authOtpCode')?.value || '').trim();
+      const errBanner = document.getElementById('authErrorBanner');
+      const errMsg = document.getElementById('authErrorMsg');
+
+      if (!code) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = 'Please enter the 6-digit verification code.';
+          errBanner.style.display = 'flex';
+        }
+        return;
+      }
+
+      try {
+        const data = await API.verifyPhoneOTP(fullPhone, code);
+        this.user = data.user;
+        this.closeModal('authModal');
+        this.showToast(`Welcome back, ${this.user.name}!`, 'success');
+        await this.onLoginSuccess();
+      } catch (err) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = err.message || 'Invalid or expired verification code.';
+          errBanner.style.display = 'flex';
+        }
+      }
+    },
+
+    async handleModalPasswordLogin() {
+      const identifier = document.getElementById('modalLoginIdentifier')?.value?.trim();
+      const password = document.getElementById('modalLoginPassword')?.value;
+      const submitBtn = document.getElementById('btnModalPasswordSubmit');
+      const errBanner = document.getElementById('authErrorBanner');
+      const errMsg = document.getElementById('authErrorMsg');
+
+      if (errBanner) errBanner.style.display = 'none';
+      if (!identifier || !password) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = 'Please enter both your registered email or phone and password.';
+          errBanner.style.display = 'flex';
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying...';
+      }
+
+      try {
+        const data = await API.login(identifier, password);
+        this.user = data.user;
+        this.closeModal('authModal');
+        this.showToast(`Welcome back, ${this.user.name}!`, 'success');
+        await this.onLoginSuccess();
+      } catch (err) {
+        if (errBanner && errMsg) {
+          errMsg.textContent = err.message || 'Invalid email/phone or password.';
+          errBanner.style.display = 'flex';
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Sign In to Portal →';
+        }
+      }
+    },
+
+    async fillAndLoginDemo(email, pass, role) {
+      try {
+        const data = await API.login(email, pass);
+        this.user = data.user;
+        this.selectedLoginPortal = role;
+        this.closeModal('authModal');
+        this.showToast(`Signed in as ${this.user.name} (${role})`, 'success');
+        await this.onLoginSuccess();
+      } catch (err) {
+        this.showToast(`Demo sign-in failed: ${err.message}`, 'error');
+      }
+    },
+
+    togglePublicMobileNav() {
+      const links = document.getElementById('publicNavLinks');
+      if (links) {
+        links.classList.toggle('mobile-open');
+      }
+    },
+
     // Show 3-Portal Login Page (Section 4)
+    showLoginPage(event) {
+      if (event) event.preventDefault();
+      this.showLoginView();
+    },
+
     showLoginView(noticeMessage, targetPortal = 'FACULTY') {
       const landing = document.getElementById('landingView');
       const login = document.getElementById('loginView');
@@ -164,6 +534,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     async onLoginSuccess() {
       if (!this.user) return;
 
+      localStorage.setItem('edvanta_view', 'portal');
+      this.updateNavbarAuthStatus();
+
       // Hide public pages, show App Shell
       const landing = document.getElementById('landingView');
       const login = document.getElementById('loginView');
@@ -196,15 +569,110 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.startAlertsPolling();
     },
 
+    getGreetingForRole(roleOverride) {
+      const now = new Date();
+      const hour = now.getHours();
+      const role = roleOverride || (this.user ? this.user.role : 'ADMIN');
+      const roleTitle = role === 'ADMIN' ? 'Admin' : (role === 'FACULTY' ? 'Faculty' : 'Student');
+
+      // Exact ranges:
+      // 5:00 AM – 11:59 AM: Good Morning, [Role] (☀️)
+      // 12:00 PM – 4:59 PM: Good Afternoon, [Role] (🌤️)
+      // 5:00 PM – 4:59 AM: Good Evening, [Role] (🌙)
+      let period = 'evening';
+      let timeGreeting = 'Good Evening';
+      let emoji = '🌙';
+
+      if (hour >= 5 && hour < 12) {
+        period = 'morning';
+        timeGreeting = 'Good Morning';
+        emoji = '☀️';
+      } else if (hour >= 12 && hour < 17) {
+        period = 'afternoon';
+        timeGreeting = 'Good Afternoon';
+        emoji = '🌤️';
+      } else {
+        period = 'evening';
+        timeGreeting = 'Good Evening';
+        emoji = '🌙';
+      }
+
+      return {
+        period,
+        timeGreeting,
+        roleTitle,
+        greetingText: `${timeGreeting}, ${roleTitle}`,
+        emoji,
+        isDaytime: period === 'morning' || period === 'afternoon'
+      };
+    },
+
+    updateGreetingBanner() {
+      const greetingInfo = this.getGreetingForRole();
+      const { period, timeGreeting, emoji } = greetingInfo;
+
+      const portalTargets = [
+        { headingId: 'adminWelcomeGreeting', emojiId: 'adminGreetingEmoji', roleTitle: 'Admin' },
+        { headingId: 'studentWelcomeGreeting', emojiId: 'studentGreetingEmoji', roleTitle: 'Student' },
+        { headingId: 'facultyWelcomeGreeting', emojiId: 'facultyGreetingEmoji', roleTitle: 'Faculty' }
+      ];
+
+      portalTargets.forEach(t => {
+        const headingEl = document.getElementById(t.headingId);
+        if (headingEl) {
+          headingEl.textContent = `${timeGreeting}, ${t.roleTitle}`;
+        }
+        const emojiEl = document.getElementById(t.emojiId);
+        if (emojiEl) {
+          emojiEl.textContent = emoji;
+        }
+      });
+
+      // Update time-based background variation class on all portal welcome cards
+      document.querySelectorAll('.portal-welcome-card').forEach(card => {
+        card.classList.remove('morning', 'afternoon', 'evening');
+        card.classList.add(period);
+      });
+    },
+
+    initGreetingTimer() {
+      if (this._greetingTimer) clearInterval(this._greetingTimer);
+      this.updateGreetingBanner();
+      // Auto-update every 30 seconds so time period transition happens seamlessly
+      this._greetingTimer = setInterval(() => {
+        this.updateGreetingBanner();
+      }, 30000);
+    },
+
+    getNavIcon(id) {
+      const strokeW = 1.8;
+      const icons = {
+        home: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
+        dashboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>`,
+        attendance: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+        curriculum: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
+        calendar: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
+        users: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+        alerts: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`,
+        imports: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>`,
+        ai: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16.01"></line><line x1="16" y1="16" x2="16" y2="16.01"></line></svg>`,
+        logger: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+        history: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 8 14"></polyline></svg>`,
+        student: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>`,
+        exams: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`
+      };
+      return icons[id] || `<span class="nav-dot">●</span>`;
+    },
+
     updateHeaderUI() {
       if (!this.user) return;
 
       const portalBadge = document.getElementById('portalRoleBadge');
       const topbarPill = document.getElementById('currentPortalNamePill');
 
-      let portalLabel = '👑 ADMIN PORTAL';
-      if (this.user.role === 'FACULTY') portalLabel = '👨‍🏫 FACULTY PORTAL';
-      if (this.user.role === 'STUDENT') portalLabel = '🎓 STUDENT PORTAL';
+      let portalLabel = 'ADMIN PORTAL';
+      if (this.user.role === 'FACULTY') portalLabel = 'FACULTY PORTAL';
+      if (this.user.role === 'STUDENT') portalLabel = 'STUDENT PORTAL';
 
       if (portalBadge) {
         portalBadge.className = `portal-badge ${this.user.role}`;
@@ -232,6 +700,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (simPill) {
         simPill.style.display = this.user.role === 'STUDENT' ? 'none' : 'flex';
       }
+
+      // Update Personalized Welcome Section & Dynamic Banners (Section 1)
+      this.updateGreetingBanner();
+      this.initGreetingTimer();
+
+      // Supporting subtitles with real authenticated details
+      const campusStr = this.user.campus_name || (this.user.role === 'ADMIN' ? 'All Campuses' : 'Campus');
+      const adminSub = document.getElementById('adminWelcomeSubtitle');
+      if (adminSub) {
+        adminSub.textContent = `Welcome back, ${this.user.name} • ${campusStr} • Academic Year 2026–2027 • MSOT Progression Tracker`;
+      }
+      const studentSub = document.getElementById('studentWelcomeSubtitle');
+      if (studentSub) {
+        studentSub.textContent = `Welcome back, ${this.user.name} • ${this.user.batch_name || 'MSOT Batch'} • ${campusStr}`;
+      }
+      const facultySub = document.getElementById('facultyWelcomeSubtitle');
+      if (facultySub) {
+        facultySub.textContent = `Welcome back, ${this.user.name} • ${campusStr} • Teaching Sessions & Fast Session Logger`;
+      }
+
+      // Topbar user profile widgets
+      const topbarAvatar = document.getElementById('topbarUserAvatar');
+      if (topbarAvatar) topbarAvatar.textContent = (this.user.name || 'U').charAt(0).toUpperCase();
+      const topbarName = document.getElementById('topbarUserName');
+      if (topbarName) topbarName.textContent = this.user.name;
+      const topbarRole = document.getElementById('topbarUserRole');
+      if (topbarRole) topbarRole.textContent = this.user.role;
     },
 
     // Render Left Sidebar Navigation Links (Section 5 & 6)
@@ -242,35 +737,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       let tabs = [];
       if (this.user.role === 'ADMIN' || this.user.role === 'CAMPUS_MANAGER') {
         tabs = [
-          { id: 'dashboard', icon: '📊', label: 'Dashboard & Pacing' },
-          { id: 'attendance', icon: '⏱️', label: 'Attendance Management' },
-          { id: 'curriculum', icon: '📚', label: '7 Subjects Curriculum' },
-          { id: 'calendar', icon: '📅', label: 'Master Timetable' },
-          { id: 'users', icon: '👥', label: 'User Accounts' },
-          { id: 'alerts', icon: '🚨', label: 'Alerts & Escalations' },
-          { id: 'imports', icon: '📁', label: 'CSV Import & Export' }
+          { id: 'dashboard', label: 'Dashboard & Pacing' },
+          { id: 'attendance', label: 'Attendance Management' },
+          { id: 'curriculum', label: '7 Subjects Curriculum' },
+          { id: 'calendar', label: 'Master Timetable' },
+          { id: 'users', label: 'User Accounts' },
+          { id: 'alerts', label: 'Alerts & Escalations' },
+          { id: 'imports', label: 'CSV Import & Export' },
+          { id: 'ai', label: 'AI Academic Assistant' }
         ];
       } else if (this.user.role === 'FACULTY') {
         tabs = [
-          { id: 'logger', icon: '⚡', label: 'Fast Session Logger' },
-          { id: 'attendance', icon: '⏱️', label: 'Class Attendance' },
-          { id: 'calendar', icon: '📅', label: 'My Teaching Schedule' },
-          { id: 'curriculum', icon: '📚', label: 'My Subjects & Topics' },
-          { id: 'history', icon: '🕒', label: 'Session History' },
-          { id: 'alerts', icon: '🔔', label: 'Teaching Reminders' }
+          { id: 'logger', label: 'Fast Session Logger' },
+          { id: 'attendance', label: 'Class Attendance' },
+          { id: 'calendar', label: 'My Teaching Schedule' },
+          { id: 'curriculum', label: 'My Subjects & Topics' },
+          { id: 'history', label: 'Session History' },
+          { id: 'alerts', label: 'Teaching Reminders' },
+          { id: 'ai', label: 'AI Teaching Assistant' }
         ];
       } else if (this.user.role === 'STUDENT') {
         tabs = [
-          { id: 'student', icon: '🎓', label: 'My Enrolled Subjects' },
-          { id: 'attendance', icon: '⏱️', label: 'My Attendance' },
-          { id: 'calendar', icon: '📅', label: 'My Class Timetable' },
-          { id: 'exams', icon: '🎯', label: 'Exam Readiness & Dates' }
+          { id: 'student', label: 'My Enrolled Subjects' },
+          { id: 'attendance', label: 'My Attendance' },
+          { id: 'calendar', label: 'My Class Timetable' },
+          { id: 'exams', label: 'Exam Readiness & Dates' },
+          { id: 'ai', label: 'AI Study Assistant' }
         ];
       }
 
       container.innerHTML = tabs.map(t => `
         <button type="button" class="sidebar-nav-item ${t.id === this.activeTab ? 'active' : ''}" data-tab="${t.id}" onclick="App.switchTab('${t.id}')">
-          <span class="nav-icon">${t.icon}</span>
+          <span class="nav-icon">${this.getNavIcon(t.id)}</span>
           <span>${t.label}</span>
         </button>
       `).join('');
@@ -332,6 +830,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           await this.refreshActiveTab();
         });
       }
+
+      // Keyboard Accessibility: Escape key closes active modals
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const modals = ['exploreFeaturesModal', 'authModal', 'aboutModal', 'contactModal', 'studentTopicsModal', 'addHolidayModal', 'telegramModal', 'whatsappModal', 'changePasswordModal', 'aiModal'];
+          modals.forEach(mId => this.closeModal(mId));
+        }
+      });
     },
 
     handleBrandClick(event) {
@@ -392,9 +898,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     },
 
-    handleLogout() {
-      API.logout();
+    async handleLogout() {
+      await API.logout();
       this.user = null;
+      localStorage.removeItem('edvanta_view');
+      this.updateNavbarAuthStatus();
       this.showToast('You have been signed out successfully.', 'info');
       this.showLandingPage();
     },
@@ -461,9 +969,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.toggleSidebarMobile(false);
 
       // Section 13: Role-based navigation guards
-      const adminTabs = ['dashboard', 'attendance', 'curriculum', 'calendar', 'users', 'alerts', 'imports'];
-      const facultyTabs = ['logger', 'attendance', 'calendar', 'curriculum', 'history', 'alerts'];
-      const studentTabs = ['student', 'attendance', 'calendar', 'exams'];
+      const adminTabs = ['dashboard', 'attendance', 'curriculum', 'calendar', 'users', 'alerts', 'imports', 'ai', 'exams'];
+      const facultyTabs = ['logger', 'attendance', 'calendar', 'curriculum', 'history', 'alerts', 'ai'];
+      const studentTabs = ['student', 'attendance', 'calendar', 'exams', 'ai'];
 
       const role = this.user.role;
       let isAllowed = false;
@@ -519,6 +1027,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         await this.loadAlertsView();
       } else if (this.activeTab === 'imports') {
         await this.loadImportsView();
+      } else if (this.activeTab === 'ai') {
+        await this.loadAIView();
       }
 
       this.checkAlertsBadge();
@@ -591,6 +1101,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
+      const topbarCampSelect = document.getElementById('topbarCampusSelect');
+      if (topbarCampSelect) {
+        if (this.user && this.user.role === 'CAMPUS_MANAGER' && this.user.campus_id) {
+          const userCamp = displayCampuses.find(c => c.id === this.user.campus_id) || { id: this.user.campus_id, name: this.user.campus_name || 'Assigned Campus' };
+          topbarCampSelect.innerHTML = `<option value="${userCamp.id}" selected>${userCamp.name}</option>`;
+          topbarCampSelect.disabled = true;
+        } else {
+          topbarCampSelect.disabled = false;
+          topbarCampSelect.innerHTML = `<option value="">All Campuses (${displayCampuses.length})</option>` +
+            displayCampuses.map(c => `<option value="${c.id}" ${this.activeFilters.campus_id === c.id ? 'selected' : ''}>${c.name}</option>`).join('');
+        }
+      }
+
       const trackSelect = document.getElementById('trackFilter');
       if (trackSelect) {
         trackSelect.innerHTML = '<option value="">All Academic Tracks</option>' +
@@ -601,6 +1124,45 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (semSelect) {
         semSelect.innerHTML = '<option value="">All Active Semesters</option>' +
           this.semesters.map(s => `<option value="${s.id}">${s.name} (${s.batch_name})</option>`).join('');
+      }
+    },
+
+    handleTopbarCampusChange(campusId) {
+      const campSelect = document.getElementById('campusFilter');
+      if (campSelect) campSelect.value = campusId;
+      this.activeFilters.campus_id = campusId || null;
+      this.handleFilterChange();
+    },
+
+    handleTopbarSearch(query) {
+      query = (query || '').trim().toLowerCase();
+      if (!query) {
+        document.querySelectorAll('#dashboardSubjectsTableBody tr, #studentSubjectsContainer .content-card, #usersTableBody tr, #curriculumSubjectsContainer .content-card').forEach(el => {
+          el.style.display = '';
+        });
+        return;
+      }
+      if (this.activeTab === 'dashboard') {
+        document.querySelectorAll('#dashboardSubjectsTableBody tr').forEach(row => {
+          const text = row.textContent.toLowerCase();
+          row.style.display = text.includes(query) ? '' : 'none';
+        });
+      } else if (this.activeTab === 'student') {
+        document.querySelectorAll('#studentSubjectsContainer .content-card').forEach(card => {
+          const text = card.textContent.toLowerCase();
+          card.style.display = text.includes(query) ? '' : 'none';
+        });
+      } else if (this.activeTab === 'attendance') {
+        const searchInput = document.getElementById('attSearchInput');
+        if (searchInput) {
+          searchInput.value = query;
+          this.applyAttendanceFilters();
+        }
+      } else if (this.activeTab === 'users') {
+        document.querySelectorAll('#usersTableBody tr').forEach(row => {
+          const text = row.textContent.toLowerCase();
+          row.style.display = text.includes(query) ? '' : 'none';
+        });
       }
     },
 
@@ -629,6 +1191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const res = await API.getAttendanceRecords();
         const records = res.records || [];
         const summary = res.summary || {};
+        this.allAttendanceRecords = records;
 
         // Update KPI summary cards
         const totalEl = document.getElementById('attSummaryTotal');
@@ -639,12 +1202,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalVal = summary.totalSessions !== undefined ? summary.totalSessions : records.length;
         const presVal = summary.presentCount !== undefined ? summary.presentCount : records.filter(r => r.status === 'PRESENT').length;
         const absVal = summary.absentCount !== undefined ? summary.absentCount : (totalVal - presVal);
-        const rateVal = totalVal > 0 ? Math.round((presVal / totalVal) * 100) : 100;
+        const rateVal = totalVal > 0 ? `${Math.round((presVal / totalVal) * 100)}%` : '0%';
 
         if (totalEl) totalEl.textContent = totalVal;
         if (presentEl) presentEl.textContent = presVal;
         if (absentEl) absentEl.textContent = absVal;
-        if (rateEl) rateEl.textContent = `${rateVal}%`;
+        if (rateEl) rateEl.textContent = rateVal;
 
         // Check active attendance session
         const activeRes = await API.getActiveAttendanceSessions();
@@ -656,26 +1219,50 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (role === 'STUDENT' && activeSessions.length > 0) {
             const activeSess = activeSessions[0];
             this.currentActiveAttendanceSessionId = activeSess.id;
+            this.currentActiveSessionData = activeSess;
+
             const titleEl = document.getElementById('activeAttSubjectTitle');
             const descEl = document.getElementById('activeAttFacultyInfo');
-            if (titleEl) titleEl.textContent = `🔴 Active Attendance: ${activeSess.subject_name} (${activeSess.subject_code})`;
-            if (descEl) descEl.textContent = `Conducted by ${activeSess.faculty_name} for ${activeSess.batch_name}. Click below to verify your presence.`;
+            const beaconBadge = document.getElementById('activeAttBeaconBadge');
+            const bleBtn = document.getElementById('btnSubmitBLEAttendance');
+            const webBtn = document.getElementById('btnSubmitStudentAttendance');
 
-            const submitBtn = document.getElementById('btnSubmitStudentAttendance');
-            if (submitBtn) {
-              if (activeSess.hasSubmitted) {
-                submitBtn.textContent = '✅ Present Recorded';
-                submitBtn.disabled = true;
-                submitBtn.className = 'btn-secondary';
-              } else {
-                submitBtn.textContent = '✅ Mark Present Now';
-                submitBtn.disabled = false;
-                submitBtn.className = 'btn-primary';
+            if (titleEl) titleEl.textContent = `Active Attendance: ${activeSess.subject_name} (${activeSess.subject_code})`;
+            if (descEl) descEl.textContent = `Instructor: ${activeSess.faculty_name} • Batch: ${activeSess.batch_name}. Select check-in method:`;
+            if (beaconBadge) {
+              beaconBadge.textContent = `BLE Beacon: ${activeSess.ble_beacon_code || 'Active'}`;
+              beaconBadge.style.display = 'inline-flex';
+            }
+
+            this.startAttendanceCountdown(activeSess.expires_at);
+
+            if (activeSess.hasSubmitted) {
+              if (bleBtn) {
+                bleBtn.style.display = 'none';
+              }
+              if (webBtn) {
+                webBtn.textContent = `✅ Present Recorded (${activeSess.marking_method || 'Portal'})`;
+                webBtn.disabled = true;
+                webBtn.className = 'btn-secondary';
+              }
+            } else {
+              if (bleBtn) {
+                bleBtn.style.display = 'inline-flex';
+                bleBtn.disabled = false;
+              }
+              if (webBtn) {
+                webBtn.textContent = '🌐 Standard Web Check-In';
+                webBtn.disabled = false;
+                webBtn.className = 'btn-secondary';
               }
             }
             studentCard.style.display = 'flex';
           } else {
             studentCard.style.display = 'none';
+            if (this.attCountdownInterval) {
+              clearInterval(this.attCountdownInterval);
+              this.attCountdownInterval = null;
+            }
           }
         }
 
@@ -685,21 +1272,114 @@ document.addEventListener('DOMContentLoaded', async () => {
           if ((role === 'FACULTY' || role === 'ADMIN' || role === 'CAMPUS_MANAGER') && activeSessions.length > 0) {
             const activeSess = activeSessions[0];
             this.currentActiveAttendanceSessionId = activeSess.id;
+            this.currentActiveSessionData = activeSess;
+
             const titleEl = document.getElementById('facActiveSessionTitle');
             const descEl = document.getElementById('facActiveSessionDesc');
+            const beaconPill = document.getElementById('facSessionBeaconPill');
+
             if (titleEl) titleEl.textContent = `Active Attendance: ${activeSess.subject_name} (${activeSess.batch_name})`;
-            if (descEl) descEl.textContent = `Date: ${activeSess.session_date} • Submitted Students: ${activeSess.present_count || 0}`;
+            if (descEl) descEl.textContent = `Date: ${activeSess.session_date} • Submitted: ${activeSess.present_count || 0} of ${activeSess.total_enrolled || 0} enrolled students`;
+            if (beaconPill) beaconPill.textContent = `Beacon: ${activeSess.ble_beacon_code || 'EDV-BLE'}`;
+
             facCard.style.display = 'block';
           } else {
             facCard.style.display = 'none';
           }
         }
 
-        // Render attendance table
-        this.renderAttendanceTable(records);
+        // Populate subject filter dropdown
+        this.populateAttendanceSubjectFilter();
+
+        // Render attendance table with active filters
+        this.applyAttendanceFilters();
       } catch (err) {
         console.error('Failed to load attendance view:', err);
       }
+    },
+
+    startAttendanceCountdown(expiresAtIso) {
+      if (this.attCountdownInterval) {
+        clearInterval(this.attCountdownInterval);
+        this.attCountdownInterval = null;
+      }
+
+      const cdEl = document.getElementById('studentAttCountdown');
+      if (!cdEl || !expiresAtIso) return;
+
+      const updateCountdown = () => {
+        const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
+        if (remainingMs <= 0) {
+          cdEl.textContent = '⏱️ Session Expired';
+          cdEl.style.color = 'var(--text-danger)';
+          if (this.attCountdownInterval) {
+            clearInterval(this.attCountdownInterval);
+            this.attCountdownInterval = null;
+          }
+        } else {
+          const totalSecs = Math.floor(remainingMs / 1000);
+          const mins = Math.floor(totalSecs / 60);
+          const secs = totalSecs % 60;
+          cdEl.textContent = `⏱️ ${mins}m ${secs < 10 ? '0' : ''}${secs}s remaining`;
+          cdEl.style.color = 'var(--primary-blue)';
+        }
+      };
+
+      updateCountdown();
+      this.attCountdownInterval = setInterval(updateCountdown, 1000);
+    },
+
+    async populateAttendanceSubjectFilter() {
+      const select = document.getElementById('attFilterSubject');
+      if (!select || select.options.length > 1) return;
+
+      try {
+        const data = await API.getSubjects();
+        const subjects = data.subjects || [];
+        subjects.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.code} - ${s.name}`;
+          select.appendChild(opt);
+        });
+      } catch (e) {}
+    },
+
+    applyAttendanceFilters() {
+      const subjFilter = document.getElementById('attFilterSubject')?.value || '';
+      const statusFilter = document.getElementById('attFilterStatus')?.value || '';
+      const dateFilter = document.getElementById('attFilterDate')?.value || '';
+      const searchFilter = (document.getElementById('attSearchInput')?.value || '').trim().toLowerCase();
+
+      let filtered = (this.allAttendanceRecords || []).filter(r => {
+        if (subjFilter && r.subject_id !== subjFilter) return false;
+        if (statusFilter && r.status !== statusFilter) return false;
+        if (dateFilter && r.session_date !== dateFilter) return false;
+        if (searchFilter) {
+          const matchStudent = (r.student_name || '').toLowerCase().includes(searchFilter);
+          const matchEmail = (r.student_email || '').toLowerCase().includes(searchFilter);
+          const matchSubject = (r.subject_name || '').toLowerCase().includes(searchFilter) || (r.subject_code || '').toLowerCase().includes(searchFilter);
+          const matchBatch = (r.batch_name || '').toLowerCase().includes(searchFilter);
+          if (!matchStudent && !matchEmail && !matchSubject && !matchBatch) return false;
+        }
+        return true;
+      });
+
+      this.renderAttendanceTable(filtered);
+    },
+
+    resetAttendanceFilters() {
+      const subjEl = document.getElementById('attFilterSubject');
+      const statusEl = document.getElementById('attFilterStatus');
+      const dateEl = document.getElementById('attFilterDate');
+      const searchEl = document.getElementById('attSearchInput');
+
+      if (subjEl) subjEl.value = '';
+      if (statusEl) statusEl.value = '';
+      if (dateEl) dateEl.value = '';
+      if (searchEl) searchEl.value = '';
+
+      this.applyAttendanceFilters();
     },
 
     renderAttendanceTable(records) {
@@ -707,16 +1387,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!tbody) return;
 
       const attHeading = document.getElementById('attendanceTableHeading');
+      const controls = document.getElementById('attendanceTableControls');
       if (attHeading && this.user) {
         attHeading.textContent = this.user.role === 'STUDENT' ? 'My Class Attendance Log' : 'Attendance Records Log';
+      }
+      if (controls) {
+        controls.textContent = `Showing ${records.length} record${records.length === 1 ? '' : 's'}`;
       }
 
       if (!records || records.length === 0) {
         const isStudent = this.user && this.user.role === 'STUDENT';
         const msg = isStudent
-          ? 'No attendance records logged yet for your profile. When your instructor initiates an attendance session, an active session card will appear at the top to record your presence.'
-          : 'No attendance records found for the selected campus or filters.';
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-secondary); line-height: 1.5;">${msg}</td></tr>`;
+          ? 'No attendance records match your filter. When your instructor initiates an attendance session, an active session banner will appear at the top.'
+          : 'No attendance records found matching the specified filters.';
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--text-secondary); line-height: 1.5;">${msg}</td></tr>`;
         return;
       }
 
@@ -725,6 +1409,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       tbody.innerHTML = records.map(r => {
         const studentInfo = r.student_name ? `${r.student_name} (${r.batch_name || 'Class'})` : (r.batch_name || 'Class');
         const statusClass = r.status === 'PRESENT' ? 'ontrack' : (r.status === 'EXCUSED' ? 'tight' : 'danger');
+        const methodBadge = r.marking_method === 'BLUETOOTH'
+          ? '<span class="status-pill ontrack" style="font-size: 0.72rem;">🔵 BLE</span>'
+          : (r.marking_method === 'MANUAL'
+            ? '<span class="status-pill tight" style="font-size: 0.72rem;">✏️ Manual</span>'
+            : '<span class="status-pill neutral" style="font-size: 0.72rem;">🌐 Portal</span>');
 
         return `
           <tr>
@@ -737,13 +1426,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <td>
               <span class="status-pill ${statusClass}">${r.status}</span>
             </td>
+            <td>${methodBadge}</td>
             <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${r.marked_by}</span></td>
             <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">
               ${r.created_at ? r.created_at.split(' ')[1] || r.created_at : '—'}
             </td>
             <td>
               ${isPrivileged ? `
-                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.openEditAttendanceModal('${r.id}', '${r.student_name || 'Student'}', '${r.status}', '${(r.notes || '').replace(/'/g, "\\'")}')">
+                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.openEditAttendanceModal('${r.id}', '${(r.student_name || 'Student').replace(/'/g, "\\'")}', '${r.status}', '${(r.notes || '').replace(/'/g, "\\'")}')">
                   ✏️ Correct
                 </button>
               ` : `
@@ -776,15 +1466,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const subjectId = document.getElementById('attModalSubject').value;
       const batchName = document.getElementById('attModalBatch').value;
       const campusId = document.getElementById('attModalCampus').value;
+      const validityMinutes = document.getElementById('attModalValidity')?.value || 15;
 
       try {
-        await API.startAttendanceSession({
+        const res = await API.startAttendanceSession({
           subject_id: subjectId,
           batch_name: batchName,
-          campus_id: campusId
+          campus_id: campusId,
+          validity_minutes: validityMinutes
         });
         this.closeModal('startAttendanceModal');
-        this.showToast('Attendance session initiated! Students can now submit check-in.', 'success');
+        this.showToast(`Attendance session initiated! Beacon: ${res.ble_beacon_code}. Validity: ${validityMinutes} mins.`, 'success');
         await this.loadAttendanceView();
       } catch (err) {
         this.showToast(`Failed to initiate attendance: ${err.message}`, 'error');
@@ -807,8 +1499,180 @@ document.addEventListener('DOMContentLoaded', async () => {
         this.showToast(`Error: ${err.message}`, 'error');
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = '✅ Mark Present Now';
+          submitBtn.textContent = '🌐 Standard Web Check-In';
         }
+      }
+    },
+
+    async submitBluetoothAttendance() {
+      if (!this.currentActiveAttendanceSessionId || !this.currentActiveSessionData) {
+        this.showToast('No active class attendance session to verify.', 'warning');
+        return;
+      }
+
+      const session = this.currentActiveSessionData;
+
+      // Check browser Web Bluetooth hardware capability and secure context
+      const isBluetoothSupported = Boolean(navigator.bluetooth && navigator.bluetooth.requestDevice);
+      const isSecureContext = window.isSecureContext;
+
+      if (!isBluetoothSupported || !isSecureContext) {
+        const explanation = !isSecureContext
+          ? 'Web Bluetooth requires a Secure Context (HTTPS or localhost).'
+          : 'Web Bluetooth is not supported in this browser engine (iOS Safari/WebKit or Firefox). Chrome or Edge on Desktop/Android is required.';
+
+        alert(`📡 Bluetooth Proximity Check Notice:\n\n${explanation}\n\nPlease click "Standard Web Check-In" to record your presence directly.`);
+        return;
+      }
+
+      const bleBtn = document.getElementById('btnSubmitBLEAttendance');
+      if (bleBtn) {
+        bleBtn.disabled = true;
+        bleBtn.textContent = 'Scanning BLE...';
+      }
+
+      try {
+        this.showToast('Scanning for classroom Bluetooth beacon (EDVANTA)...', 'info');
+
+        // Request BLE peripheral device
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'EDVANTA' }
+          ],
+          optionalServices: [
+            'generic_access',
+            session.ble_service_uuid || '0000ed01-0000-1000-8000-00805f9b34fb'
+          ]
+        });
+
+        // Connect GATT server for physical proximity confirmation
+        if (device && device.gatt) {
+          await device.gatt.connect();
+        }
+
+        // Send verified BLE attendance submission to backend
+        const result = await API.submitAttendanceBLE({
+          attendance_session_id: session.id,
+          ble_beacon_code: session.ble_beacon_code,
+          client_timestamp: Date.now()
+        });
+
+        this.showToast(`✅ ${result.message || 'Bluetooth attendance verified!'}`, 'success');
+        await this.loadAttendanceView();
+      } catch (err) {
+        if (err.name === 'NotFoundError') {
+          this.showToast('Bluetooth scan cancelled or no classroom beacon selected. You can use Standard Web Check-In.', 'warning');
+        } else {
+          this.showToast(`Bluetooth note: ${err.message}. You can use Standard Web Check-In.`, 'info');
+        }
+      } finally {
+        if (bleBtn) {
+          bleBtn.disabled = false;
+          bleBtn.innerHTML = '<span>🔵</span><span>Check In via Bluetooth (BLE)</span>';
+        }
+      }
+    },
+
+    async openSessionRosterModal() {
+      if (!this.currentActiveAttendanceSessionId) return;
+      const modal = document.getElementById('sessionRosterModal');
+      if (modal) modal.style.display = 'flex';
+      await this.loadSessionRoster();
+    },
+
+    async loadSessionRoster() {
+      if (!this.currentActiveAttendanceSessionId) return;
+      const tbody = document.getElementById('sessionRosterTableBody');
+      const statsPill = document.getElementById('rosterStatsPill');
+      if (!tbody) return;
+
+      try {
+        const data = await API.getSessionRoster(this.currentActiveAttendanceSessionId);
+        const roster = data.roster || [];
+        const summary = data.summary || {};
+
+        if (statsPill) {
+          statsPill.innerHTML = `
+            <span><strong>Enrolled:</strong> ${summary.totalEnrolled || 0}</span>
+            <span style="color: #10B981;"><strong>Present:</strong> ${summary.presentCount || 0}</span>
+            <span style="color: #EF4444;"><strong>Absent:</strong> ${summary.absentCount || 0}</span>
+            <span style="color: var(--text-secondary);"><strong>Not Marked:</strong> ${summary.notMarkedCount || 0}</span>
+            <span style="color: var(--primary-blue);"><strong>Rate:</strong> ${summary.attendanceRate || 0}%</span>
+          `;
+        }
+
+        if (roster.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No students enrolled in this batch.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = roster.map(s => {
+          const statusClass = s.status === 'PRESENT' ? 'ontrack' : (s.status === 'ABSENT' ? 'danger' : 'neutral');
+          const methodPill = s.marking_method === 'BLUETOOTH'
+            ? '<span class="status-pill ontrack" style="font-size: 0.72rem;">🔵 BLE</span>'
+            : (s.marking_method === 'MANUAL'
+              ? '<span class="status-pill tight" style="font-size: 0.72rem;">✏️ Manual</span>'
+              : (s.status === 'PRESENT' ? '<span class="status-pill neutral" style="font-size: 0.72rem;">🌐 Portal</span>' : '—'));
+
+          return `
+            <tr>
+              <td>
+                <strong>${s.student_name}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">${s.student_email || s.batch_name}</div>
+              </td>
+              <td><span class="status-pill ${statusClass}">${s.status}</span></td>
+              <td>${methodPill}</td>
+              <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">
+                ${s.marked_at ? s.marked_at.split(' ')[1] || s.marked_at : '—'}
+              </td>
+              <td>
+                <div style="display: flex; gap: 0.35rem;">
+                  <button type="button" class="btn-primary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.markStudentManual('${s.student_id}', 'PRESENT')">
+                    ✓ Present
+                  </button>
+                  <button type="button" class="btn-danger" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.markStudentManual('${s.student_id}', 'ABSENT')">
+                    ✗ Absent
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-danger);">Failed to load roster: ${err.message}</td></tr>`;
+      }
+    },
+
+    async markStudentManual(studentId, status) {
+      if (!this.currentActiveAttendanceSessionId) return;
+      try {
+        await API.markAttendanceManual({
+          attendance_session_id: this.currentActiveAttendanceSessionId,
+          student_id: studentId,
+          status
+        });
+        this.showToast(`Marked student ${status}.`, 'success');
+        await this.loadSessionRoster();
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Failed: ${err.message}`, 'error');
+      }
+    },
+
+    async finalizeUnrecordedAttendance() {
+      if (!this.currentActiveAttendanceSessionId) return;
+      if (!confirm('Mark all remaining unrecorded students as ABSENT and close this attendance session?')) {
+        return;
+      }
+
+      try {
+        const res = await API.finalizeUnrecordedAttendance(this.currentActiveAttendanceSessionId);
+        this.showToast(res.message || 'Session finalized successfully.', 'info');
+        this.closeModal('sessionRosterModal');
+        this.currentActiveAttendanceSessionId = null;
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast(`Failed to finalize: ${err.message}`, 'error');
       }
     },
 
@@ -818,6 +1682,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         await API.closeAttendanceSession(this.currentActiveAttendanceSessionId);
         this.showToast('Attendance session ended and closed.', 'info');
         this.currentActiveAttendanceSessionId = null;
+        if (this.attCountdownInterval) {
+          clearInterval(this.attCountdownInterval);
+          this.attCountdownInterval = null;
+        }
         await this.loadAttendanceView();
       } catch (err) {
         this.showToast(`Failed to close session: ${err.message}`, 'error');
@@ -862,6 +1730,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         this.renderDashboardKPIs(data.summary);
         this.renderDashboardCharts(data.subjects, data.summary);
         this.renderDashboardTable(data.subjects);
+        this.renderNeedsAttention(data.subjects, data.summary);
+        this.renderUpcomingEvents(data.upcomingExams);
+        await this.renderRecentActivity();
       } catch (err) {
         if (container) container.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--status-red-text); padding: 2rem;">Failed to load dashboard: ${err.message}</td></tr>`;
       }
@@ -1085,6 +1956,175 @@ document.addEventListener('DOMContentLoaded', async () => {
           </tr>
         `;
       }).join('');
+    },
+
+    renderNeedsAttention(subjects, summary) {
+      const container = document.getElementById('needsAttentionList');
+      const badge = document.getElementById('attentionCountBadge');
+      if (!container) return;
+
+      const attentionItems = [];
+
+      subjects.forEach(s => {
+        if (s.status === 'DANGER') {
+          attentionItems.push({
+            type: 'danger',
+            badge: 'DANGER',
+            subjectId: s.id,
+            title: `${s.code}: ${s.name}`,
+            desc: `Buffer Ratio: ${s.bufferRatio !== null ? s.bufferRatio : '< 1.00'} — Pacing critical (${s.batch_name || s.campus_name})`,
+            actionLabel: 'Inspect'
+          });
+        } else if (s.status === 'TIGHT') {
+          attentionItems.push({
+            type: 'warning',
+            badge: 'TIGHT',
+            subjectId: s.id,
+            title: `${s.code}: ${s.name}`,
+            desc: `Buffer Ratio: ${s.bufferRatio} — Pace margin tight (${s.batch_name || s.campus_name})`,
+            actionLabel: 'Inspect'
+          });
+        } else if (s.overdueTopicsCount && s.overdueTopicsCount > 0) {
+          attentionItems.push({
+            type: 'warning',
+            badge: 'OVERDUE',
+            subjectId: s.id,
+            title: `${s.code}: ${s.name}`,
+            desc: `${s.overdueTopicsCount} lesson topics behind planned schedule`,
+            actionLabel: 'Inspect'
+          });
+        }
+      });
+
+      if (badge) {
+        if (attentionItems.length > 0) {
+          badge.textContent = `${attentionItems.length} Item${attentionItems.length > 1 ? 's' : ''}`;
+          badge.className = `attention-badge ${attentionItems.some(i => i.type === 'danger') ? 'danger' : 'warning'}`;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      if (attentionItems.length === 0) {
+        container.innerHTML = `
+          <div style="background-color: var(--status-green-bg); border: 1px solid var(--status-green-border); border-radius: var(--radius-md); padding: 1.25rem 1rem; text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">✓</div>
+            <div style="font-weight: 700; color: var(--status-green-text); font-size: 0.92rem;">All Core Subjects On Track</div>
+            <p style="font-size: 0.78rem; color: var(--status-green-text); margin-top: 0.2rem; opacity: 0.9;">
+              No subjects currently require intervention. Safe progression buffer ratios maintained.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = attentionItems.slice(0, 5).map(item => `
+        <div class="needs-attention-item ${item.type}">
+          <div style="display: flex; align-items: flex-start; gap: 0.65rem; min-width: 0;">
+            <span class="attention-badge ${item.type}" style="margin-top: 0.1rem; flex-shrink: 0;">${item.badge}</span>
+            <div style="min-width: 0;">
+              <div style="font-weight: 700; color: var(--heading-deep-blue); font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${item.title}
+              </div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.3; margin-top: 0.15rem;">
+                ${item.desc}
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; flex-shrink: 0;" onclick="App.inspectTraceability('${item.subjectId}')">
+            ${item.actionLabel}
+          </button>
+        </div>
+      `).join('');
+    },
+
+    renderUpcomingEvents(upcomingExams) {
+      const container = document.getElementById('upcomingEventsList');
+      if (!container) return;
+
+      const events = [];
+
+      if (upcomingExams && upcomingExams.length > 0) {
+        upcomingExams.forEach(e => {
+          let dateStr = e.start_date || '2026-10-24';
+          const d = new Date(dateStr);
+          const monthStr = isNaN(d.getTime()) ? 'OCT' : d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+          const dayStr = isNaN(d.getTime()) ? '24' : d.getDate();
+
+          events.push({
+            month: monthStr,
+            day: dayStr,
+            title: e.name || 'Examination Window',
+            meta: `${e.semester_name || 'Semester Term'} • Weightage ${e.weightage || 20}%`
+          });
+        });
+      } else {
+        events.push(
+          { month: 'OCT', day: '24', title: 'Mid-Term Examination Window', meta: 'MSOT 2026 Batch • Weightage 30%' },
+          { month: 'NOV', day: '14', title: 'Working Saturday (2nd Saturday)', meta: 'Scheduled Full Academic Day' },
+          { month: 'NOV', day: '28', title: 'Syllabus Milestone Check', meta: 'Unit 4 Pacing Target Review' },
+          { month: 'DEC', day: '15', title: 'End-Term Examination Window', meta: 'Final Comprehensive Scope • Weightage 50%' }
+        );
+      }
+
+      container.innerHTML = events.slice(0, 4).map(e => `
+        <div class="event-item">
+          <div class="event-date-box">
+            <span class="event-month">${e.month}</span>
+            <span class="event-day">${e.day}</span>
+          </div>
+          <div class="event-details">
+            <div class="event-title">${e.title}</div>
+            <div class="event-meta">${e.meta}</div>
+          </div>
+          <span class="status-pill complete" style="font-size: 0.7rem; flex-shrink: 0;">Scheduled</span>
+        </div>
+      `).join('');
+    },
+
+    async renderRecentActivity() {
+      const container = document.getElementById('recentActivityList');
+      if (!container) return;
+
+      try {
+        const historyData = await API.getSessionHistory({ limit: 8 });
+        const sessions = historyData.sessions || [];
+
+        if (sessions.length === 0) {
+          container.innerHTML = `
+            <div style="padding: 1.25rem 0; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+              No recent sessions recorded yet today.
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = sessions.map(s => `
+          <div class="activity-feed-item">
+            <div style="display: flex; align-items: center; gap: 0.85rem; min-width: 0;">
+              <div class="activity-feed-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <div class="activity-feed-content">
+                <div class="activity-feed-title">
+                  <strong>${s.subject_code}</strong>: ${s.subject_name || 'Class Session Delivered'}
+                </div>
+                <div class="activity-feed-time">
+                  ${s.faculty_name || 'Faculty'} • ${formatDuration(s.duration_hours || 1)} • ${s.session_date || 'Recent'}
+                </div>
+              </div>
+            </div>
+            <span class="status-pill complete" style="font-size: 0.72rem; flex-shrink: 0;">Logged</span>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `
+          <div style="padding: 1rem 0; text-align: center; color: var(--text-muted); font-size: 0.82rem;">
+            Activity stream synced with audit log.
+          </div>
+        `;
+      }
     },
 
     async inspectTraceability(subjectId) {
@@ -1412,7 +2452,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!data.sessions || data.sessions.length === 0) {
           listContainer.innerHTML = `
             <div class="content-card" style="text-align:center; padding: 2.5rem;">
-              <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📅</div>
+              <div style="width: 52px; height: 52px; border-radius: 12px; background: var(--surface-soft); color: var(--primary-blue); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </div>
               <h3 style="font-size: 1.25rem; color: var(--heading-deep-blue); margin-bottom: 0.35rem;">
                 No Timetable Sessions Scheduled for ${data.dayName} (${data.activeDate})
               </h3>
@@ -1420,11 +2462,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 You do not have a scheduled class slot on this day. You can review your complete weekly schedule, inspect other days, or launch an instant logger session for any of your assigned subjects.
               </p>
               <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
-                <button type="button" class="btn-primary" onclick="App.openInstantSubjectLogger()">
-                  ⚡ Quick Log Assigned Subject
+                <button type="button" class="btn-primary" onclick="App.openInstantSubjectLogger()" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                  <span>Quick Log Assigned Subject</span>
                 </button>
-                <button type="button" class="btn-secondary" onclick="App.switchTab('calendar')">
-                  📅 View My Teaching Schedule
+                <button type="button" class="btn-secondary" onclick="App.switchTab('calendar')" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  <span>View My Teaching Schedule</span>
                 </button>
               </div>
             </div>
@@ -1708,7 +2752,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (subjects.length === 0) {
           container.innerHTML = `
             <div class="content-card" style="text-align:center; padding: 2.5rem;">
-              <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎓</div>
+              <div style="width: 52px; height: 52px; border-radius: 12px; background: var(--surface-soft); color: var(--primary-blue); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+              </div>
               <h3 style="font-size: 1.2rem; color: var(--heading-deep-blue); margin-bottom: 0.5rem;">No Enrolled Subjects Found</h3>
               <p style="color: var(--text-secondary); font-size: 0.9rem;">
                 No academic subjects are currently enrolled for your batch. Contact your academic administrator if this is unexpected.
@@ -1921,6 +2967,493 @@ document.addEventListener('DOMContentLoaded', async () => {
         await this.loadInitialMetadata();
       } catch (err) {
         this.showToast(`Import error: ${err.message}`, 'error');
+      }
+    },
+
+    // -------------------------------------------------------------
+    // TAB 11: AI ACADEMIC ASSISTANT (Phase 1)
+    // -------------------------------------------------------------
+    aiChatHistory: [],
+
+    async loadAIView() {
+      if (!this.user) return;
+      const role = this.user.role;
+
+      // Update subtitle and welcome message based on role
+      const subtitle = document.getElementById('aiSubtitle');
+      const welcome = document.getElementById('aiWelcomeMessageText');
+
+      if (role === 'STUDENT') {
+        if (subtitle) subtitle.textContent = 'Ask for concept explanations, study notes, formula derivations, and practice MCQs.';
+        if (welcome && (!this.aiChatHistory || !this.aiChatHistory.length)) {
+          welcome.innerHTML = `
+            Hello <strong>${this.user.name}</strong>! I am your EDVANTA Study Assistant for <strong>${this.user.batch_name || 'your batch'}</strong>.<br><br>
+            I can help you understand challenging topics, generate practice revision MCQs, explain algorithms, and summarize study notes. What would you like to learn today?
+          `;
+        }
+      } else if (role === 'FACULTY') {
+        if (subtitle) subtitle.textContent = 'Assistance with 50-minute lesson plans, Bloom\'s taxonomy questions, syllabus pacing, and lab prompts.';
+        if (welcome && (!this.aiChatHistory || !this.aiChatHistory.length)) {
+          welcome.innerHTML = `
+            Welcome <strong>${this.user.name}</strong>! I am your EDVANTA Teaching Assistant.<br><br>
+            I can help structure 50-minute teaching sessions, develop formative assessment MCQs, draft homework prompts, and summarize syllabus units. What would you like to plan today?
+          `;
+        }
+      } else {
+        if (subtitle) subtitle.textContent = 'Strategic guidance on curriculum pacing, accreditation frameworks, and academic management.';
+        if (welcome && (!this.aiChatHistory || !this.aiChatHistory.length)) {
+          welcome.innerHTML = `
+            Welcome Dean / Administrator <strong>${this.user.name}</strong>! I am your EDVANTA Academic Operations Assistant.<br><br>
+            I can assist with syllabus pacing analysis frameworks, curriculum delivery benchmarks, and institutional guidelines.
+          `;
+        }
+      }
+
+      // Check provider configuration status
+      try {
+        const status = await API.getAIStatus();
+        const badge = document.getElementById('aiModelStatusBadge');
+        const warning = document.getElementById('aiConfigWarning');
+
+        if (status.configured) {
+          if (badge) {
+            badge.className = 'status-pill ontrack';
+            badge.textContent = `${status.provider === 'gemini' ? 'Gemini 1.5 Flash' : status.provider.toUpperCase()} • Active`;
+          }
+          if (warning) warning.style.display = 'none';
+        } else {
+          if (badge) {
+            badge.className = 'status-pill tight';
+            badge.textContent = 'Waiting for API Key';
+          }
+          if (warning) warning.style.display = 'block';
+        }
+      } catch (err) {
+        console.warn('AI status check warning:', err);
+      }
+
+      // Render role-based quick prompt chips
+      this.renderAISuggestionChips(role);
+
+      // Setup character counter
+      const input = document.getElementById('aiPromptInput');
+      const counter = document.getElementById('aiCharCount');
+      if (input && counter) {
+        input.oninput = () => {
+          counter.textContent = input.value.length;
+        };
+      }
+    },
+
+    renderAISuggestionChips(role) {
+      const container = document.getElementById('aiSuggestionChips');
+      if (!container) return;
+
+      let chips = [];
+      if (role === 'STUDENT') {
+        chips = [
+          'Explain Virtual Machines vs Containers simply',
+          'Generate 5 practice MCQs on Binary Search with answers',
+          'Summarize CAP Theorem in 3 clear bullet points',
+          'Key differences between Type-1 and Type-2 hypervisors',
+          'How should I prepare for a Mid-Term exam on Data Structures?'
+        ];
+      } else if (role === 'FACULTY') {
+        chips = [
+          'Draft a 50-minute lesson plan for CAP Theorem and PACELC',
+          'Generate 5 Bloom\'s taxonomy MCQs on Cloud Storage (S3 vs EBS)',
+          'Suggest interactive lab exercises for Linux namespaces and cgroups',
+          'Explain Amdahl\'s Law vs Gustafson\'s Law with a whiteboard analogy',
+          'How to handle leftover syllabus topics when a class is delayed?'
+        ];
+      } else {
+        chips = [
+          'Explain syllabus pacing management and buffer ratio interpretation',
+          'Best practices for preventing academic calendar delays before exams',
+          'Curricular benchmarking guidelines for engineering tracks',
+          'How to support faculty with high carry-forward topic volumes?'
+        ];
+      }
+
+      container.innerHTML = chips.map(c => `
+        <button type="button" class="ai-chip" onclick="App.useAISuggestion('${c.replace(/'/g, "\\'")}')">
+          <span>✨</span>
+          <span>${c}</span>
+        </button>
+      `).join('');
+    },
+
+    useAISuggestion(promptText) {
+      const input = document.getElementById('aiPromptInput');
+      if (input) {
+        input.value = promptText;
+        const counter = document.getElementById('aiCharCount');
+        if (counter) counter.textContent = promptText.length;
+        this.sendAIMessage();
+      }
+    },
+
+    async sendAIMessage() {
+      const input = document.getElementById('aiPromptInput');
+      const sendBtn = document.getElementById('btnSendAI');
+      const typingIndicator = document.getElementById('aiTypingIndicator');
+
+      if (!input) return;
+      const prompt = input.value.trim();
+      if (!prompt) return;
+
+      // 1. Append user bubble
+      this.appendAIMessage('user', prompt);
+      input.value = '';
+      const counter = document.getElementById('aiCharCount');
+      if (counter) counter.textContent = '0';
+
+      // 2. Disable send button and show typing indicator
+      if (sendBtn) sendBtn.disabled = true;
+      if (typingIndicator) typingIndicator.style.display = 'flex';
+
+      // Scroll messages container to bottom
+      const messagesContainer = document.getElementById('aiChatMessages');
+      if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      try {
+        const res = await API.sendAIChat(prompt, this.aiChatHistory);
+        const replyText = res.response || 'No response generated.';
+
+        // Append assistant bubble
+        this.appendAIMessage('model', replyText);
+
+        // Record in conversation history (keep last 8)
+        this.aiChatHistory.push({ role: 'user', text: prompt });
+        this.aiChatHistory.push({ role: 'model', text: replyText });
+        if (this.aiChatHistory.length > 8) {
+          this.aiChatHistory = this.aiChatHistory.slice(-8);
+        }
+      } catch (err) {
+        this.appendAIMessage('error', `⚠️ ${err.message || 'Failed to reach AI Assistant.'}`);
+        this.showToast(err.message || 'AI request failed', 'error');
+      } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (typingIndicator) typingIndicator.style.display = 'none';
+        if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (input) input.focus();
+      }
+    },
+
+    appendAIMessage(role, text) {
+      const container = document.getElementById('aiChatMessages');
+      if (!container) return;
+
+      const isUser = role === 'user';
+      const isError = role === 'error';
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const avatar = isUser ? '👤' : (isError ? '⚠️' : '🤖');
+      const author = isUser ? (this.user?.name || 'You') : 'EDVANTA AI Academic Assistant';
+
+      // Simple markdown-to-HTML parser for bullet points, bold, headings, and code
+      const formatMarkdown = (raw) => {
+        let html = raw
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Fenced code blocks
+        html = html.replace(/```([\s\S]*?)```/g, '<pre style="background: var(--surface-soft); padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-family: \'JetBrains Mono\', monospace; font-size: 0.82rem; border: 1px solid var(--borders);"><code>$1</code></pre>');
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // Bold
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        // Headings
+        html = html.replace(/^### (.*$)/gim, '<h3 style="margin-top: 0.5rem; color: inherit;">$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h3 style="margin-top: 0.5rem; color: inherit;">$1</h3>');
+        // Bullets
+        html = html.replace(/^\* (.*$)/gim, '<li style="margin-left: 1.25rem;">$1</li>');
+        html = html.replace(/^- (.*$)/gim, '<li style="margin-left: 1.25rem;">$1</li>');
+        // Paragraph newlines
+        html = html.replace(/\n\n/g, '<br><br>');
+        return html;
+      };
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `ai-msg ${isUser ? 'ai-msg-user' : 'ai-msg-bot'}`;
+      if (isError) {
+        msgDiv.style.alignSelf = 'center';
+      }
+
+      msgDiv.innerHTML = `
+        <div class="ai-msg-avatar">${avatar}</div>
+        <div class="ai-msg-body" style="${isError ? 'background: #FCE4E4; border-color: #F87171; color: #991B1B;' : ''}">
+          <div class="ai-msg-header">
+            <strong>${author}</strong>
+            <span class="ai-msg-time">${timeStr}</span>
+          </div>
+          <div class="ai-msg-content">
+            ${isError ? text : formatMarkdown(text)}
+          </div>
+        </div>
+      `;
+
+      container.appendChild(msgDiv);
+    },
+
+    clearAIChat() {
+      this.aiChatHistory = [];
+      const container = document.getElementById('aiChatMessages');
+      if (container) {
+        const welcomeText = this.user?.role === 'STUDENT'
+          ? `Chat cleared! Hello <strong>${this.user.name}</strong>, ask any academic or study question to get started.`
+          : `Chat cleared! Hello <strong>${this.user?.name || 'Professor'}</strong>, how can I assist with your curriculum planning today?`;
+
+        container.innerHTML = `
+          <div class="ai-msg ai-msg-bot">
+            <div class="ai-msg-avatar">🤖</div>
+            <div class="ai-msg-body">
+              <div class="ai-msg-header">
+                <strong>EDVANTA AI Academic Assistant</strong>
+                <span class="ai-msg-time">Just now</span>
+              </div>
+              <div class="ai-msg-content">${welcomeText}</div>
+            </div>
+          </div>
+        `;
+      }
+      this.showToast('AI conversation history cleared.', 'info');
+    },
+
+    // -------------------------------------------------------------
+    // TELEGRAM BOT MODAL (Phase 2)
+    // -------------------------------------------------------------
+    tgCountdownTimer: null,
+
+    async openTelegramModal() {
+      this.openModal('telegramModal');
+      await this.refreshTelegramModal();
+    },
+
+    async refreshTelegramModal() {
+      try {
+        const status = await API.getTelegramStatus();
+        const unlinkedView = document.getElementById('tgUnlinkedView');
+        const linkedView = document.getElementById('tgLinkedView');
+        const botHandle = document.getElementById('tgBotHandle');
+        if (botHandle && status.bot_username) {
+          botHandle.textContent = `@${status.bot_username}`;
+        }
+
+        if (status.is_linked) {
+          if (unlinkedView) unlinkedView.style.display = 'none';
+          if (linkedView) linkedView.style.display = 'block';
+          const details = document.getElementById('tgLinkedDetails');
+          if (details) {
+            const dateStr = status.linked_at ? new Date(status.linked_at).toLocaleDateString() : 'Active';
+            details.innerHTML = `
+              <strong>Linked Account:</strong> ${status.telegram_username ? '@' + status.telegram_username : 'Connected'}<br>
+              <strong>Status:</strong> Active • Linked on ${dateStr}
+            `;
+          }
+        } else {
+          if (unlinkedView) unlinkedView.style.display = 'block';
+          if (linkedView) linkedView.style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Failed to load Telegram status:', err);
+      }
+    },
+
+    async generateTelegramCode() {
+      const codeText = document.getElementById('tgCodeText');
+      const instruction = document.getElementById('tgCodeInstruction');
+      const timerBadge = document.getElementById('tgTimerBadge');
+      const btn = document.getElementById('btnGenerateTgCode');
+
+      try {
+        if (btn) btn.disabled = true;
+        const res = await API.generateTelegramLinkCode();
+        if (codeText) codeText.textContent = res.code;
+        if (instruction) instruction.textContent = `Valid for 10 minutes. Send /link ${res.code} to your bot.`;
+        if (timerBadge) {
+          timerBadge.style.display = 'inline-block';
+          timerBadge.className = 'status-pill tight';
+          let remainingSeconds = res.expires_in_seconds || 600;
+          if (this.tgCountdownTimer) clearInterval(this.tgCountdownTimer);
+          this.tgCountdownTimer = setInterval(() => {
+            remainingSeconds--;
+            if (remainingSeconds <= 0) {
+              clearInterval(this.tgCountdownTimer);
+              timerBadge.textContent = 'Expired';
+              timerBadge.className = 'status-pill danger';
+            } else {
+              const mins = Math.floor(remainingSeconds / 60);
+              const secs = remainingSeconds % 60;
+              timerBadge.textContent = `Expires in ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+          }, 1000);
+        }
+        this.showToast('Telegram linking code generated!', 'success');
+      } catch (err) {
+        this.showToast(err.message || 'Failed to generate code', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    },
+
+    async unlinkTelegramAccount() {
+      if (!confirm('Are you sure you want to unlink your Telegram account? You will stop receiving academic alerts.')) {
+        return;
+      }
+
+      try {
+        await API.unlinkTelegram();
+        this.showToast('Telegram account unlinked.', 'info');
+        await this.refreshTelegramModal();
+      } catch (err) {
+        this.showToast(err.message || 'Failed to unlink account', 'error');
+      }
+    },
+
+    // -------------------------------------------------------------
+    // WHATSAPP BUSINESS PLATFORM MODAL (Phase 3)
+    // -------------------------------------------------------------
+    waCountdownTimer: null,
+
+    async openWhatsAppModal() {
+      this.openModal('whatsappModal');
+      await this.refreshWhatsAppModal();
+    },
+
+    async refreshWhatsAppModal() {
+      try {
+        const status = await API.getWhatsAppStatus();
+        const unlinkedView = document.getElementById('waUnlinkedView');
+        const linkedView = document.getElementById('waLinkedView');
+        const phoneInput = document.getElementById('waPhoneInput');
+
+        if (this.user?.phone && phoneInput && !phoneInput.value) {
+          phoneInput.value = this.user.phone;
+        }
+
+        if (status.is_linked) {
+          if (unlinkedView) unlinkedView.style.display = 'none';
+          if (linkedView) linkedView.style.display = 'block';
+          const numDisplay = document.getElementById('waLinkedNumber');
+          if (numDisplay) numDisplay.textContent = status.phone_number || 'Connected';
+
+          const master = document.getElementById('waPrefMaster');
+          const att = document.getElementById('waPrefAttendance');
+          const sched = document.getElementById('waPrefSchedule');
+          const prog = document.getElementById('waPrefProgress');
+
+          if (master && status.preferences) master.checked = Boolean(status.preferences.notifications_enabled);
+          if (att && status.preferences) att.checked = Boolean(status.preferences.notify_attendance);
+          if (sched && status.preferences) sched.checked = Boolean(status.preferences.notify_schedule);
+          if (prog && status.preferences) prog.checked = Boolean(status.preferences.notify_progress);
+        } else {
+          if (unlinkedView) unlinkedView.style.display = 'block';
+          if (linkedView) linkedView.style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Failed to load WhatsApp status:', err);
+      }
+    },
+
+    async requestWhatsAppCode() {
+      const phoneInput = document.getElementById('waPhoneInput');
+      const btn = document.getElementById('btnWaSendCode');
+      const otpSection = document.getElementById('waOtpSection');
+      const timerBadge = document.getElementById('waTimerBadge');
+
+      if (!phoneInput || !phoneInput.value.trim()) {
+        this.showToast('Please enter your mobile phone number.', 'warning');
+        return;
+      }
+
+      try {
+        if (btn) btn.disabled = true;
+        const res = await API.requestWhatsAppCode(phoneInput.value.trim());
+        if (otpSection) otpSection.style.display = 'block';
+        if (timerBadge) {
+          let seconds = res.expires_in_seconds || 600;
+          if (this.waCountdownTimer) clearInterval(this.waCountdownTimer);
+          this.waCountdownTimer = setInterval(() => {
+            seconds--;
+            if (seconds <= 0) {
+              clearInterval(this.waCountdownTimer);
+              timerBadge.textContent = 'Expired';
+              timerBadge.className = 'status-pill danger';
+            } else {
+              const mins = Math.floor(seconds / 60);
+              const rem = seconds % 60;
+              timerBadge.textContent = `Valid for ${mins}:${rem < 10 ? '0' : ''}${rem}`;
+            }
+          }, 1000);
+        }
+        this.showToast('Verification code generated!', 'success');
+        const codeInput = document.getElementById('waCodeInput');
+        if (codeInput) {
+          if (res.dev_code) codeInput.value = res.dev_code;
+          codeInput.focus();
+        }
+      } catch (err) {
+        this.showToast(err.message || 'Failed to request code', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    },
+
+    async verifyWhatsAppCode() {
+      const phoneInput = document.getElementById('waPhoneInput');
+      const codeInput = document.getElementById('waCodeInput');
+      const btn = document.getElementById('btnWaVerify');
+
+      if (!phoneInput || !phoneInput.value.trim() || !codeInput || !codeInput.value.trim()) {
+        this.showToast('Please enter both phone number and 6-digit code.', 'warning');
+        return;
+      }
+
+      try {
+        if (btn) btn.disabled = true;
+        await API.verifyWhatsAppCode(phoneInput.value.trim(), codeInput.value.trim());
+        this.showToast('WhatsApp account linked successfully!', 'success');
+        if (this.waCountdownTimer) clearInterval(this.waCountdownTimer);
+        await this.refreshWhatsAppModal();
+      } catch (err) {
+        this.showToast(err.message || 'Verification failed', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    },
+
+    async saveWhatsAppPreferences() {
+      const master = document.getElementById('waPrefMaster')?.checked;
+      const att = document.getElementById('waPrefAttendance')?.checked;
+      const sched = document.getElementById('waPrefSchedule')?.checked;
+      const prog = document.getElementById('waPrefProgress')?.checked;
+
+      try {
+        await API.updateWhatsAppPreferences({
+          notifications_enabled: master,
+          notify_attendance: att,
+          notify_schedule: sched,
+          notify_progress: prog
+        });
+        this.showToast('Notification preferences updated.', 'info');
+      } catch (err) {
+        this.showToast(err.message || 'Failed to save preferences', 'error');
+      }
+    },
+
+    async unlinkWhatsAppAccount() {
+      if (!confirm('Are you sure you want to unlink your WhatsApp account? You will stop receiving academic alerts.')) {
+        return;
+      }
+
+      try {
+        await API.unlinkWhatsApp();
+        this.showToast('WhatsApp account unlinked.', 'info');
+        await this.refreshWhatsAppModal();
+      } catch (err) {
+        this.showToast(err.message || 'Failed to unlink account', 'error');
       }
     },
 

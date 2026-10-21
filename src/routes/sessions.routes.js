@@ -29,13 +29,31 @@ router.get('/today', authenticate, (req, res) => {
   `;
   const params = [dow];
 
-  // Faculty only see their own assigned classes
+  // Role-based filtering for scheduled slots
   if (req.user.role === 'FACULTY') {
     sql += ` AND ts.faculty_id = ?`;
     params.push(req.user.id);
   } else if (req.user.role === 'CAMPUS_MANAGER') {
     sql += ` AND ts.campus_id = ?`;
     params.push(req.user.campus_id);
+  } else if (req.user.role === 'STUDENT') {
+    if (req.user.campus_id) {
+      sql += ` AND ts.campus_id = ?`;
+      params.push(req.user.campus_id);
+    }
+    if (req.user.batch_name) {
+      sql += ` AND ts.batch_name = ?`;
+      params.push(req.user.batch_name);
+    }
+  } else {
+    if (req.query.campus_id) {
+      sql += ` AND ts.campus_id = ?`;
+      params.push(req.query.campus_id);
+    }
+    if (req.query.batch_name) {
+      sql += ` AND ts.batch_name = ?`;
+      params.push(req.query.batch_name);
+    }
   }
 
   sql += ` ORDER BY ts.start_time ASC`;
@@ -107,9 +125,15 @@ router.get('/history', authenticate, (req, res) => {
   } else if (req.user.role === 'CAMPUS_MANAGER') {
     sql += ` AND sess.campus_id = ?`;
     params.push(req.user.campus_id);
-  } else if (req.user.role === 'STUDENT' && req.user.batch_name) {
-    sql += ` AND sess.batch_name = ?`;
-    params.push(req.user.batch_name);
+  } else if (req.user.role === 'STUDENT') {
+    if (req.user.batch_name) {
+      sql += ` AND sess.batch_name = ?`;
+      params.push(req.user.batch_name);
+    }
+    if (req.user.campus_id) {
+      sql += ` AND sess.campus_id = ?`;
+      params.push(req.user.campus_id);
+    }
   }
 
   sql += ` ORDER BY sess.session_date DESC, sess.logged_at DESC LIMIT 100`;

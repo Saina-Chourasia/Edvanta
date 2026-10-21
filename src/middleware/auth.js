@@ -7,12 +7,18 @@ import { db } from '../database/db.js';
 export const JWT_SECRET = process.env.JWT_SECRET || 'edvanta-msot-academic-tracker-secret-2026';
 
 export function authenticate(req, res, next) {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Authentication required. No authorization header provided.' });
+  if (authHeader) {
+    token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  } else if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)edvanta_token=([^;]+)/);
+    if (match) token = decodeURIComponent(match[1]);
   }
 
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required. No authorization header provided.' });
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -37,12 +43,18 @@ export function authenticate(req, res, next) {
 
 // Optional auth - populates req.user if token is valid, but does not block if missing
 export function optionalAuth(req, res, next) {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return next();
+  if (authHeader) {
+    token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  } else if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)edvanta_token=([^;]+)/);
+    if (match) token = decodeURIComponent(match[1]);
   }
 
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!token) {
+    return next();
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);

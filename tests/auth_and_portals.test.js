@@ -307,4 +307,69 @@ describe('Part 2 & Part 3: Real Authentication & Portals RBAC Tests', () => {
     });
     assert.equal(badTokenRes.status, 401, 'Invalid token must be rejected with 401');
   });
+
+  // 10. Phone number formatting & normalization in password login
+  test('User can log in with phone formatted with +91 country code or spacing', async () => {
+    // With +91
+    const res1 = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: '+919876543210', password: 'edvanta123' })
+    });
+    assert.equal(res1.status, 200);
+    const data1 = await res1.json();
+    assert.equal(data1.user.role, 'ADMIN');
+
+    // With +91 and spaces
+    const res2 = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: '+91 9876543220', password: 'edvanta123' })
+    });
+    assert.equal(res2.status, 200);
+    const data2 = await res2.json();
+    assert.equal(data2.user.role, 'FACULTY');
+  });
+
+  // 11. Phone OTP Send & Verify Flow
+  test('Phone OTP flow successfully sends verification code and authenticates user', async () => {
+    // 1. Send OTP for registered user
+    const sendRes = await fetch(`${baseUrl}/api/auth/otp/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '+91 9876543230' }) // Aarav Mehta
+    });
+    assert.equal(sendRes.status, 200);
+    const sendData = await sendRes.json();
+    assert.ok(sendData.dev_code, 'Dev code must be returned for testing');
+    assert.equal(sendData.phone, '9876543230');
+
+    // 2. Reject incorrect OTP
+    const badOtpRes = await fetch(`${baseUrl}/api/auth/otp/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '9876543230', code: '000000' })
+    });
+    assert.equal(badOtpRes.status, 401);
+
+    // 3. Verify with correct OTP
+    const verifyRes = await fetch(`${baseUrl}/api/auth/otp/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '+91 9876543230', code: sendData.dev_code })
+    });
+    assert.equal(verifyRes.status, 200);
+    const verifyData = await verifyRes.json();
+    assert.ok(verifyData.token);
+    assert.equal(verifyData.user.role, 'STUDENT');
+    assert.equal(verifyData.user.name, 'Aarav Mehta');
+
+    // 4. Reject unknown phone number
+    const unknownRes = await fetch(`${baseUrl}/api/auth/otp/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '9999999999' })
+    });
+    assert.equal(unknownRes.status, 404);
+  });
 });

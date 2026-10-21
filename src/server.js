@@ -1,6 +1,14 @@
 // EDVANTA Server Entrypoint
 // Express application serving REST APIs and the mobile-first frontend
 
+try {
+  if (typeof process.loadEnvFile === 'function') {
+    process.loadEnvFile();
+  }
+} catch (e) {
+  // .env file is optional when environment variables are injected directly by host
+}
+
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
@@ -18,11 +26,16 @@ import examsRoutes from './routes/exams.routes.js';
 import alertsRoutes from './routes/alerts.routes.js';
 import importsRoutes from './routes/imports.routes.js';
 import attendanceRoutes from './routes/attendance.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import telegramRoutes from './routes/telegram.routes.js';
+import TelegramService from './services/telegram.service.js';
+import whatsappRoutes from './routes/whatsapp.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -56,6 +69,9 @@ app.use('/api/alerts', alertsRoutes);
 app.use('/api/imports', importsRoutes);
 app.use('/api/exports', importsRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/telegram', telegramRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Fallback to index.html for SPA client navigation
 app.use((req, res) => {
@@ -82,6 +98,8 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`🌐 URL: http://localhost:${PORT}`);
     console.log(`📡 REST API Health: http://localhost:${PORT}/api/health`);
     console.log(`====================================================`);
+    // Initialize Telegram Bot polling if explicitly enabled in environment
+    TelegramService.startPolling();
   });
 }
 

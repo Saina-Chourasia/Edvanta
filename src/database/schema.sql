@@ -169,6 +169,10 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
   campus_id TEXT NOT NULL REFERENCES campuses(id) ON DELETE CASCADE,
   batch_name TEXT NOT NULL,
   session_date TEXT NOT NULL, -- YYYY-MM-DD
+  validity_minutes INTEGER NOT NULL DEFAULT 15,
+  expires_at DATETIME,
+  ble_service_uuid TEXT DEFAULT '0000ed01-0000-1000-8000-00805f9b34fb',
+  ble_beacon_code TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   closed_at DATETIME
@@ -181,6 +185,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   campus_id TEXT NOT NULL REFERENCES campuses(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK(status IN ('PRESENT', 'ABSENT', 'EXCUSED')),
   marked_by TEXT NOT NULL CHECK(marked_by IN ('STUDENT', 'FACULTY', 'ADMIN')),
+  marking_method TEXT NOT NULL DEFAULT 'PORTAL' CHECK(marking_method IN ('PORTAL', 'BLUETOOTH', 'MANUAL', 'ADMIN')),
   notes TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -201,3 +206,67 @@ CREATE INDEX IF NOT EXISTS idx_att_sess_campus_batch ON attendance_sessions(camp
 CREATE INDEX IF NOT EXISTS idx_att_sess_faculty ON attendance_sessions(faculty_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_att_rec_session ON attendance_records(attendance_session_id);
 CREATE INDEX IF NOT EXISTS idx_att_rec_student ON attendance_records(student_id);
+
+-- Requirement: Telegram Academic Bot Integration
+CREATE TABLE IF NOT EXISTS telegram_links (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  telegram_chat_id TEXT NOT NULL UNIQUE,
+  telegram_username TEXT,
+  first_name TEXT,
+  linked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS telegram_link_codes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL UNIQUE,
+  expires_at INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tg_links_chat_id ON telegram_links(telegram_chat_id);
+CREATE INDEX IF NOT EXISTS idx_tg_links_user ON telegram_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_tg_link_codes_user ON telegram_link_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_tg_link_codes_hash ON telegram_link_codes(code_hash);
+
+-- Requirement: WhatsApp Business Platform Integration (Phase 3)
+CREATE TABLE IF NOT EXISTS whatsapp_links (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  phone_number TEXT NOT NULL UNIQUE,
+  verified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  notifications_enabled INTEGER NOT NULL DEFAULT 1,
+  notify_attendance INTEGER NOT NULL DEFAULT 1,
+  notify_schedule INTEGER NOT NULL DEFAULT 1,
+  notify_progress INTEGER NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_link_codes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  phone_number TEXT NOT NULL,
+  code_hash TEXT NOT NULL UNIQUE,
+  expires_at INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  phone_number TEXT NOT NULL,
+  message_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  message_id TEXT,
+  payload TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_wa_links_user ON whatsapp_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_wa_links_phone ON whatsapp_links(phone_number);
+CREATE INDEX IF NOT EXISTS idx_wa_link_codes_user ON whatsapp_link_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_wa_link_codes_hash ON whatsapp_link_codes(code_hash);
+CREATE INDEX IF NOT EXISTS idx_wa_logs_user ON whatsapp_logs(user_id);
