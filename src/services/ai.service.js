@@ -60,7 +60,7 @@ class AIService {
   /**
    * Safely retrieve verified academic context from the database for the requesting user
    */
-  static getAcademicContext(user) {
+  static async getAcademicContext(user) {
     if (!user || !user.id) return '';
     try {
       if (user.role === 'STUDENT') {
@@ -72,7 +72,7 @@ class AIService {
 - Campus: ${user.campus_name || studentCampus || 'Mirai School of Technology'}`;
 
         if (studentCampus && studentBatch) {
-          const subjects = db.query(`
+          const subjects = await db.query(`
             SELECT s.code, s.name, s.planned_total_hours
             FROM subjects s
             JOIN semesters sem ON s.semester_id = sem.id
@@ -88,7 +88,7 @@ class AIService {
           }
 
           // Verified attendance summary
-          const attRecords = db.query(`
+          const attRecords = await db.query(`
             SELECT r.status FROM attendance_records r
             WHERE r.student_id = ?
           `, [user.id]);
@@ -105,7 +105,7 @@ class AIService {
         let contextText = `\nVERIFIED FACULTY INSTRUCTION PROFILE:
 - Instructor: ${user.name}
 - Role: Faculty Instructor`;
-        const facultySubjects = db.query(`
+        const facultySubjects = await db.query(`
           SELECT s.code, s.name, s.planned_total_hours, c.name as campus_name
           FROM subjects s
           JOIN campuses c ON s.campus_id = c.id
@@ -218,7 +218,7 @@ ADMINISTRATOR ROLE GUIDELINES:
     const { provider, isConfigured, model } = this.getConfig();
     const role = user ? user.role : 'STUDENT';
     const userName = user ? user.name : 'Student';
-    const academicContext = this.getAcademicContext(user);
+    const academicContext = await this.getAcademicContext(user);
     const systemInstruction = this.getSystemInstruction(role, userName, academicContext);
     const cleanHistory = this.sanitizeHistory(history);
 

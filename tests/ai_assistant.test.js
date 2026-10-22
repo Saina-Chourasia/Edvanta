@@ -278,7 +278,7 @@ describe('Phase 1: AI Academic Assistant Integration Tests', () => {
   });
 
   // 8. Academic context injection for Student and Faculty
-  test('AIService.getAcademicContext retrieves student batch and enrolled curriculum', () => {
+  test('AIService.getAcademicContext retrieves student batch and enrolled curriculum', async () => {
     const studentUser = {
       id: 'usr_stu_aarav',
       name: 'Aarav Mehta',
@@ -287,14 +287,14 @@ describe('Phase 1: AI Academic Assistant Integration Tests', () => {
       batch_name: 'Batch-2026-Mirai-A'
     };
 
-    const context = AIService.getAcademicContext(studentUser);
+    const context = await AIService.getAcademicContext(studentUser);
     assert.match(context, /VERIFIED STUDENT ACADEMIC PROFILE/i);
     assert.match(context, /Aarav Mehta/);
     assert.match(context, /Batch-2026-Mirai-A/);
     assert.match(context, /Enrolled Curriculum Subjects/i);
   });
 
-  test('AIService.getAcademicContext retrieves faculty assigned subjects', () => {
+  test('AIService.getAcademicContext retrieves faculty assigned subjects', async () => {
     const facultyUser = {
       id: 'usr_fac_thorne',
       name: 'Dr. Aris Thorne',
@@ -302,7 +302,7 @@ describe('Phase 1: AI Academic Assistant Integration Tests', () => {
       campus_id: 'camp_hitech'
     };
 
-    const context = AIService.getAcademicContext(facultyUser);
+    const context = await AIService.getAcademicContext(facultyUser);
     assert.match(context, /VERIFIED FACULTY INSTRUCTION PROFILE/i);
     assert.match(context, /Dr. Aris Thorne/);
     assert.match(context, /Assigned Teaching Subjects/i);

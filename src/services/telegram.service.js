@@ -86,13 +86,13 @@ class TelegramService {
    * Generate a one-time 8-character linking code for an authenticated user.
    * Code expires after 10 minutes.
    */
-  static generateLinkCode(userId) {
+  static async generateLinkCode(userId) {
     if (!userId) {
       throw new Error('User ID is required to generate a linking code.');
     }
 
     // Verify user exists in database
-    const user = db.get('SELECT id, name, email, role FROM users WHERE id = ?', [userId]);
+    const user = await db.get('SELECT id, name, email, role FROM users WHERE id = ?', [userId]);
     if (!user) {
       const err = new Error('User not found.');
       err.status = 404;
@@ -111,10 +111,10 @@ class TelegramService {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
     // Invalidate any previous unused codes for this user
-    db.run('UPDATE telegram_link_codes SET used = 1 WHERE user_id = ? AND used = 0', [userId]);
+    await db.run('UPDATE telegram_link_codes SET used = 1 WHERE user_id = ? AND used = 0', [userId]);
 
     const codeId = `tg_code_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    db.run(`
+    await db.run(`
       INSERT INTO telegram_link_codes (id, user_id, code_hash, expires_at, used)
       VALUES (?, ?, ?, ?, 0)
     `, [codeId, userId, codeHash, expiresAt]);
@@ -132,7 +132,7 @@ class TelegramService {
   /**
    * Link a Telegram chat ID to an EDVANTA user using a valid one-time code
    */
-  static linkAccount(chatId, code, telegramUser = {}) {
+  static async linkAccount(chatId, code, telegramUser = {}) {
     if (!chatId) {
       return { success: false, error: 'Telegram chat ID is required.' };
     }
@@ -148,7 +148,7 @@ class TelegramService {
     const codeHash = this.hashCode(code);
 
     // Find the code record
-    const record = db.get(`
+    const record = await db.get(`
       SELECT * FROM telegram_link_codes
       WHERE code_hash = ? AND used = 0
     `, [codeHash]);
@@ -159,12 +159,12 @@ class TelegramService {
 
     if (Date.now() > record.expires_at) {
       // Mark as used so it cannot be retried
-      db.run('UPDATE telegram_link_codes SET used = 1 WHERE id = ?', [record.id]);
+      await db.run('UPDATE telegram_link_codes SET used = 1 WHERE id = ?', [record.id]);
       return { success: false, error: 'This linking code has expired (valid for 10 minutes). Please generate a new code.' };
     }
 
     // Check if this Telegram chat is already linked to another user
-    const existingChatLink = db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
+    const existingChatLink = await db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
     if (existingChatLink) {
       return {
         success: false,
@@ -173,7 +173,7 @@ class TelegramService {
     }
 
     // Check if this EDVANTA user is already linked to another Telegram account
-    const existingUserLink = db.get('SELECT * FROM telegram_links WHERE user_id = ?', [record.user_id]);
+    const existingUserLink = await db.get('SELECT * FROM telegram_links WHERE user_id = ?', [record.user_id]);
     if (existingUserLink) {
       return {
         success: false,
@@ -184,9 +184,9 @@ class TelegramService {
     // Atomically link account and invalidate code
     const linkId = `tg_link_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     try {
-      db.transaction(() => {
-        db.run('UPDATE telegram_link_codes SET used = 1 WHERE id = ?', [record.id]);
-        db.run(`
+      await db.transaction(async (tx) => {
+        await tx.run('UPDATE telegram_link_codes SET used = 1 WHERE id = ?', [record.id]);
+        await tx.run(`
           INSERT INTO telegram_links (id, user_id, telegram_chat_id, telegram_username, first_name)
           VALUES (?, ?, ?, ?, ?)
         `, [
@@ -201,40 +201,40 @@ class TelegramService {
       return { success: false, error: `Linking failed due to a database constraint: ${err.message}` };
     }
 
-    const user = db.get('SELECT id, name, email, role, batch_name, campus_id FROM users WHERE id = ?', [record.user_id]);
+    const user = await db.get('SELECT id, name, email, role, batch_name, campus_id FROM users WHERE id = ?', [record.user_id]);
     return { success: true, user };
   }
 
   /**
    * Unlink account by Telegram chat ID
    */
-  static unlinkByChatId(chatId) {
+  static async unlinkByChatId(chatId) {
     const cleanChatId = String(chatId);
-    const existing = db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
+    const existing = await db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
     if (!existing) {
       return { success: false, error: 'This Telegram account is not currently linked.' };
     }
-    db.run('DELETE FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
+    await db.run('DELETE FROM telegram_links WHERE telegram_chat_id = ?', [cleanChatId]);
     return { success: true };
   }
 
   /**
    * Unlink account by EDVANTA user ID (invoked from web portal)
    */
-  static unlinkByUserId(userId) {
-    const existing = db.get('SELECT * FROM telegram_links WHERE user_id = ?', [userId]);
+  static async unlinkByUserId(userId) {
+    const existing = await db.get('SELECT * FROM telegram_links WHERE user_id = ?', [userId]);
     if (!existing) {
       return { success: false, error: 'No Telegram account linked.' };
     }
-    db.run('DELETE FROM telegram_links WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM telegram_links WHERE user_id = ?', [userId]);
     return { success: true };
   }
 
   /**
    * Get link status for a user
    */
-  static getLinkStatus(userId) {
-    const link = db.get(`
+  static async getLinkStatus(userId) {
+    const link = await db.get(`
       SELECT tl.*, u.name as user_name, u.role as user_role
       FROM telegram_links tl
       JOIN users u ON tl.user_id = u.id
@@ -255,9 +255,9 @@ class TelegramService {
   /**
    * Retrieve linked EDVANTA user from Telegram chat ID
    */
-  static getLinkedUser(chatId) {
+  static async getLinkedUser(chatId) {
     const cleanChatId = String(chatId);
-    return db.get(`
+    return await db.get(`
       SELECT u.id, u.name, u.email, u.phone, u.role, u.batch_name, u.campus_id, c.name as campus_name
       FROM telegram_links tl
       JOIN users u ON tl.user_id = u.id
@@ -285,7 +285,7 @@ class TelegramService {
     const command = rawCommand.split('@')[0]; // strip bot username e.g. /help@edvantabot -> /help
     const args = parts.slice(1);
 
-    const user = this.getLinkedUser(chatId);
+    const user = await this.getLinkedUser(chatId);
 
     // 1. /start
     if (command === '/start') {
@@ -319,7 +319,7 @@ class TelegramService {
         );
       }
 
-      const result = this.linkAccount(chatId, code, from || {});
+      const result = await this.linkAccount(chatId, code, from || {});
       if (!result.success) {
         return this.sendMessage(chatId, `❌ *Linking Failed:*\n${result.error}`);
       }
@@ -387,22 +387,22 @@ class TelegramService {
 
     // 5. /progress
     if (command === '/progress') {
-      return this.handleProgressCommand(chatId, user);
+      return await this.handleProgressCommand(chatId, user);
     }
 
     // 6. /schedule
     if (command === '/schedule') {
-      return this.handleScheduleCommand(chatId, user);
+      return await this.handleScheduleCommand(chatId, user);
     }
 
     // 7. /attendance
     if (command === '/attendance') {
-      return this.handleAttendanceCommand(chatId, user);
+      return await this.handleAttendanceCommand(chatId, user);
     }
 
     // 8. /unlink
     if (command === '/unlink') {
-      const res = this.unlinkByChatId(chatId);
+      const res = await this.unlinkByChatId(chatId);
       if (res.success) {
         return this.sendMessage(chatId,
           `🔓 *Account Unlinked*\n` +
@@ -434,7 +434,7 @@ class TelegramService {
       }
 
       // Fetch subjects for student's batch
-      const subjects = db.query(`
+      const subjects = await db.query(`
         SELECT s.id, s.code, s.name, s.planned_total_hours
         FROM subjects s
         JOIN semesters sem ON s.semester_id = sem.id
@@ -451,7 +451,7 @@ class TelegramService {
 
       for (const subj of subjects) {
         try {
-          const prog = ProgressionService.calculateSubjectProgress(subj.id);
+          const prog = await ProgressionService.calculateSubjectProgress(subj.id);
           const statusIcon = prog.status === 'ON_TRACK' ? '🟢' : (prog.status === 'TIGHT' ? '🟡' : '🔴');
           response += `${statusIcon} *${this.escapeMarkdown(subj.code)}* (${this.escapeMarkdown(subj.name)})\n`;
           response += `   • Covered: ${prog.coveredHours.toFixed(1)} / ${prog.hoursInScope.toFixed(1)} hrs (${prog.completionPercentage}%)\n`;
@@ -466,7 +466,7 @@ class TelegramService {
     }
 
     if (user.role === 'FACULTY') {
-      const subjects = db.query(`
+      const subjects = await db.query(`
         SELECT s.id, s.code, s.name, s.planned_total_hours, sem.batch_name
         FROM subjects s
         JOIN semesters sem ON s.semester_id = sem.id
@@ -481,7 +481,7 @@ class TelegramService {
       let response = `👨‍🏫 *Teaching Progress — ${this.escapeMarkdown(user.name)}*\n\n`;
       for (const subj of subjects) {
         try {
-          const prog = ProgressionService.calculateSubjectProgress(subj.id);
+          const prog = await ProgressionService.calculateSubjectProgress(subj.id);
           const statusIcon = prog.status === 'ON_TRACK' ? '🟢' : (prog.status === 'TIGHT' ? '🟡' : '🔴');
           response += `${statusIcon} *${this.escapeMarkdown(subj.code)}* (${this.escapeMarkdown(subj.name)})\n`;
           response += `   • Batch: ${this.escapeMarkdown(subj.batch_name)}\n`;
@@ -510,7 +510,7 @@ class TelegramService {
     }
     sql += ' ORDER BY c.name, s.code';
 
-    const subjects = db.query(sql, params);
+    const subjects = await db.query(sql, params);
     if (!subjects.length) {
       return this.sendMessage(chatId, `ℹ️ No active curriculum subjects found.`);
     }
@@ -521,7 +521,7 @@ class TelegramService {
 
     for (const subj of subjects) {
       try {
-        const p = ProgressionService.calculateSubjectProgress(subj.id);
+        const p = await ProgressionService.calculateSubjectProgress(subj.id);
         if (p.status === 'ON_TRACK') onTrackCount++;
         else if (p.status === 'TIGHT') tightCount++;
         else if (p.status === 'DANGER') dangerCount++;
@@ -551,7 +551,7 @@ class TelegramService {
         return this.sendMessage(chatId, '⚠️ You are not assigned to a batch. Timetable cannot be loaded.');
       }
 
-      const slots = db.query(`
+      const slots = await db.query(`
         SELECT ts.*, s.code as subject_code, s.name as subject_name, u.name as faculty_name
         FROM timetable_slots ts
         JOIN subjects s ON ts.subject_id = s.id
@@ -580,7 +580,7 @@ class TelegramService {
     }
 
     if (user.role === 'FACULTY') {
-      const slots = db.query(`
+      const slots = await db.query(`
         SELECT ts.*, s.code as subject_code, s.name as subject_name, c.name as campus_name
         FROM timetable_slots ts
         JOIN subjects s ON ts.subject_id = s.id
@@ -609,7 +609,7 @@ class TelegramService {
     }
 
     // ADMIN
-    const totalSlots = db.get('SELECT COUNT(*) as count FROM timetable_slots');
+    const totalSlots = await db.get('SELECT COUNT(*) as count FROM timetable_slots');
     return this.sendMessage(chatId,
       `📅 *Institutional Master Schedule*\n\n` +
       `• Total Scheduled Slots: ${totalSlots?.count || 0}\n` +
@@ -622,7 +622,7 @@ class TelegramService {
    */
   static async handleAttendanceCommand(chatId, user) {
     if (user.role === 'STUDENT') {
-      const records = db.query(`
+      const records = await db.query(`
         SELECT r.status, s.session_date, subj.code as subject_code
         FROM attendance_records r
         JOIN attendance_sessions s ON r.attendance_session_id = s.id
@@ -661,7 +661,7 @@ class TelegramService {
     }
 
     if (user.role === 'FACULTY') {
-      const sessions = db.query(`
+      const sessions = await db.query(`
         SELECT s.id, s.session_date, s.batch_name, subj.code as subject_code,
                (SELECT COUNT(*) FROM attendance_records WHERE attendance_session_id = s.id) as attendee_count
         FROM attendance_sessions s
@@ -685,7 +685,7 @@ class TelegramService {
     }
 
     // ADMIN
-    const stats = db.get(`
+    const stats = await db.get(`
       SELECT
         (SELECT COUNT(*) FROM attendance_sessions) as total_sessions,
         (SELECT COUNT(*) FROM attendance_records) as total_records
@@ -765,7 +765,7 @@ class TelegramService {
   static async sendNotification(userId, message) {
     if (!userId || !message) return { sent: false, reason: 'Missing user ID or message.' };
 
-    const link = db.get('SELECT telegram_chat_id FROM telegram_links WHERE user_id = ?', [userId]);
+    const link = await db.get('SELECT telegram_chat_id FROM telegram_links WHERE user_id = ?', [userId]);
     if (!link || !link.telegram_chat_id) {
       return { sent: false, reason: 'User has not linked their Telegram account.' };
     }

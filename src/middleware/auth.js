@@ -6,7 +6,7 @@ import { db } from '../database/db.js';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'edvanta-msot-academic-tracker-secret-2026';
 
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   let token = null;
   const authHeader = req.headers.authorization;
   if (authHeader) {
@@ -24,7 +24,7 @@ export function authenticate(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     
     // Fetch latest user info from DB to guarantee current role/campus
-    const user = db.get(`
+    const user = await db.get(`
       SELECT id, email, name, role, campus_id, batch_name
       FROM users
       WHERE id = ?
@@ -42,7 +42,7 @@ export function authenticate(req, res, next) {
 }
 
 // Optional auth - populates req.user if token is valid, but does not block if missing
-export function optionalAuth(req, res, next) {
+export async function optionalAuth(req, res, next) {
   let token = null;
   const authHeader = req.headers.authorization;
   if (authHeader) {
@@ -58,7 +58,7 @@ export function optionalAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = db.get(`
+    const user = await db.get(`
       SELECT id, email, name, role, campus_id, batch_name
       FROM users
       WHERE id = ?

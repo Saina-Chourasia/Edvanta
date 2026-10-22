@@ -8,7 +8,7 @@ import ProgressionService from '../src/services/progression.service.js';
 import { db } from '../src/database/db.js';
 
 describe('Part 5: Curriculum Subjects Verification', () => {
-  test('All 7 requested subjects exist in database with accurate names and codes', () => {
+  test('All 7 requested subjects exist in database with accurate names and codes', async () => {
     const requiredNames = [
       'DSA',
       'Web Development',
@@ -19,7 +19,7 @@ describe('Part 5: Curriculum Subjects Verification', () => {
       'IT'
     ];
 
-    const subjects = db.query(`SELECT code, name, planned_total_hours FROM subjects`);
+    const subjects = await db.query(`SELECT code, name, planned_total_hours FROM subjects`);
     const foundNames = subjects.map(s => s.name);
 
     for (const reqName of requiredNames) {
@@ -30,8 +30,8 @@ describe('Part 5: Curriculum Subjects Verification', () => {
     }
   });
 
-  test('Campuses include HI-Tech, Rathinam, Jagannath, and RGI without duplication', () => {
-    const campuses = db.query(`SELECT id, name FROM campuses`);
+  test('Campuses include HI-Tech, Rathinam, Jagannath, and RGI without duplication', async () => {
+    const campuses = await db.query(`SELECT id, name FROM campuses`);
     const campusNames = campuses.map(c => c.name);
 
     assert.ok(campusNames.includes('HI-Tech Campus'), 'HI-Tech Campus must exist');
@@ -81,11 +81,11 @@ describe('Part 6: Human-Readable Duration Formatting (Exact Specification)', () 
 });
 
 describe('Part 7: Calculations Audit (Progression Engine)', () => {
-  test('calculateSubjectProgress returns verified progression metrics for seeded subject', () => {
-    const dsa = db.get(`SELECT id FROM subjects WHERE code = 'DSA101' LIMIT 1`);
+  test('calculateSubjectProgress returns verified progression metrics for seeded subject', async () => {
+    const dsa = await db.get(`SELECT id FROM subjects WHERE code = 'DSA101' LIMIT 1`);
     assert.ok(dsa, 'DSA101 subject must exist');
 
-    const progress = ProgressionService.calculateSubjectProgress(dsa.id, '2026-10-19');
+    const progress = await ProgressionService.calculateSubjectProgress(dsa.id, '2026-10-19');
     assert.ok(progress.hoursInScope > 0, 'Hours in scope must be positive');
     assert.ok(typeof progress.coveredHours === 'number', 'Covered hours must be numeric');
     assert.ok(typeof progress.remainingHours === 'number', 'Remaining hours must be numeric');

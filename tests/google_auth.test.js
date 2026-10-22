@@ -262,7 +262,7 @@ describe('Priority 3: Real Google OAuth 2.0 / OpenID Connect Authentication Test
       assert.match(location, /token=/);
 
       // Verify the user is created with role STUDENT, NOT automatically ADMIN
-      const createdUser = db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
+      const createdUser = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
       assert.ok(createdUser, 'User record must exist in SQLite for session integrity');
       assert.equal(createdUser.role, 'STUDENT', 'Allowlisted email must NOT automatically receive ADMIN privileges');
     } finally {
@@ -311,7 +311,7 @@ describe('Priority 3: Real Google OAuth 2.0 / OpenID Connect Authentication Test
       assert.match(location, /\/\?auth_success=1/);
       assert.match(location, /token=/);
 
-      const createdUser = db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
+      const createdUser = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
       assert.ok(createdUser);
       assert.equal(createdUser.role, 'STUDENT');
     } finally {
@@ -360,7 +360,7 @@ describe('Priority 3: Real Google OAuth 2.0 / OpenID Connect Authentication Test
       assert.match(location, /\/\?auth_success=1/);
       assert.match(location, /token=/);
 
-      const createdUser = db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
+      const createdUser = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
       assert.ok(createdUser);
       assert.equal(createdUser.role, 'STUDENT');
     } finally {
@@ -408,7 +408,7 @@ describe('Priority 3: Real Google OAuth 2.0 / OpenID Connect Authentication Test
       assert.ok(location);
       assert.match(location, /\/\?auth_success=1/);
 
-      const createdUser = db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
+      const createdUser = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
       assert.ok(createdUser);
       assert.equal(createdUser.role, 'FACULTY', 'Role must match GOOGLE_ALLOWED_ROLE_1');
     } finally {

@@ -11,7 +11,7 @@ import ProgressionService from '../services/progression.service.js';
 const router = Router();
 
 // Get list of semesters
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { campus_id, track_id } = req.query;
   let sql = `
     SELECT s.*, c.name as campus_name, t.name as track_name
@@ -32,12 +32,16 @@ router.get('/', (req, res) => {
   }
 
   sql += ` ORDER BY s.start_date DESC`;
-  const semesters = db.query(sql, params);
-  res.json({ semesters });
+  try {
+    const semesters = await db.query(sql, params);
+    res.json({ semesters });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Create semester (Admin only)
-router.post('/', authenticate, requireRole('ADMIN'), validateSemester, (req, res) => {
+router.post('/', authenticate, requireRole('ADMIN'), validateSemester, async (req, res) => {
   const {
     name,
     campus_id,
@@ -52,7 +56,7 @@ router.post('/', authenticate, requireRole('ADMIN'), validateSemester, (req, res
   const id = `sem_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
   try {
-    db.run(`
+    await db.run(`
       INSERT INTO semesters (id, name, campus_id, track_id, batch_name, start_date, end_date, working_saturday_rule, target_finish_date, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [id, name, campus_id, track_id, batch_name, start_date, end_date, working_saturday_rule, target_finish_date]);
@@ -64,18 +68,22 @@ router.post('/', authenticate, requireRole('ADMIN'), validateSemester, (req, res
 });
 
 // Get calendar events / holidays for a semester
-router.get('/:id/calendar', (req, res) => {
-  const events = db.query(`
-    SELECT * FROM calendar_events
-    WHERE semester_id = ?
-    ORDER BY event_date ASC
-  `, [req.params.id]);
+router.get('/:id/calendar', async (req, res) => {
+  try {
+    const events = await db.query(`
+      SELECT * FROM calendar_events
+      WHERE semester_id = ?
+      ORDER BY event_date ASC
+    `, [req.params.id]);
 
-  res.json({ events });
+    res.json({ events });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add calendar event / holiday (Admin / Campus Manager)
-router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), (req, res) => {
+router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), async (req, res) => {
   const { event_date, event_type, title, description, affects_schedule = 1 } = req.body;
   const semesterId = req.params.id;
 
@@ -83,7 +91,7 @@ router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'
     return res.status(400).json({ error: 'event_date, event_type, and title are required.' });
   }
 
-  const semester = db.get(`SELECT * FROM semesters WHERE id = ?`, [semesterId]);
+  const semester = await db.get(`SELECT * FROM semesters WHERE id = ?`, [semesterId]);
   if (!semester) {
     return res.status(404).json({ error: 'Semester not found.' });
   }
@@ -97,16 +105,16 @@ router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'
   const eventId = `ev_${semester.campus_id}_${event_date}_${Math.random().toString(36).substr(2, 4)}`;
 
   try {
-    db.run(`
+    await db.run(`
       INSERT INTO calendar_events (id, semester_id, campus_id, event_date, event_type, title, description, affects_schedule)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [eventId, semesterId, semester.campus_id, event_date, event_type, title, description || '', affects_schedule ? 1 : 0]);
 
     // Requirement 5: Adding a holiday must recalculate affected future planned topic dates!
     if (affects_schedule && event_type === 'HOLIDAY') {
-      const subjects = db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semesterId]);
+      const subjects = await db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semesterId]);
       for (const subj of subjects) {
-        ProgressionService.generatePlannedTopicDates(subj.id);
+        await ProgressionService.generatePlannedTopicDates(subj.id);
       }
     }
 
@@ -117,34 +125,42 @@ router.post('/:id/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'
 });
 
 // Remove calendar event / holiday
-router.delete('/:id/calendar/:eventId', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), (req, res) => {
+router.delete('/:id/calendar/:eventId', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), async (req, res) => {
   const { id: semesterId, eventId } = req.params;
 
-  const event = db.get(`SELECT * FROM calendar_events WHERE id = ? AND semester_id = ?`, [eventId, semesterId]);
+  const event = await db.get(`SELECT * FROM calendar_events WHERE id = ? AND semester_id = ?`, [eventId, semesterId]);
   if (!event) {
     return res.status(404).json({ error: 'Calendar event not found.' });
   }
 
-  db.run(`DELETE FROM calendar_events WHERE id = ?`, [eventId]);
+  try {
+    await db.run(`DELETE FROM calendar_events WHERE id = ?`, [eventId]);
 
-  // Recalculate affected subjects
-  const subjects = db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semesterId]);
-  for (const subj of subjects) {
-    ProgressionService.generatePlannedTopicDates(subj.id);
+    // Recalculate affected subjects
+    const subjects = await db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semesterId]);
+    for (const subj of subjects) {
+      await ProgressionService.generatePlannedTopicDates(subj.id);
+    }
+
+    res.json({ message: 'Calendar event removed and schedules updated.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  res.json({ message: 'Calendar event removed and schedules updated.' });
 });
 
 // Get exam windows for a semester
-router.get('/:id/exams', (req, res) => {
-  const exams = db.query(`
-    SELECT * FROM exam_windows
-    WHERE semester_id = ?
-    ORDER BY start_date ASC
-  `, [req.params.id]);
+router.get('/:id/exams', async (req, res) => {
+  try {
+    const exams = await db.query(`
+      SELECT * FROM exam_windows
+      WHERE semester_id = ?
+      ORDER BY start_date ASC
+    `, [req.params.id]);
 
-  res.json({ exams });
+    res.json({ exams });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

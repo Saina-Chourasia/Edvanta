@@ -8,7 +8,7 @@ import ProgressionService from '../services/progression.service.js';
 
 const router = Router();
 
-router.get('/overview', authenticate, (req, res) => {
+router.get('/overview', authenticate, async (req, res) => {
   const { campus_id, track_id, semester_id, batch_name, subject_id, as_of_date } = req.query;
 
   let subjectsQuery = `
@@ -44,7 +44,7 @@ router.get('/overview', authenticate, (req, res) => {
   if (subject_id) { subjectsQuery += ` AND s.id = ?`; params.push(subject_id); }
 
   subjectsQuery += ` ORDER BY s.code ASC`;
-  const subjects = db.query(subjectsQuery, params);
+  const subjects = await db.query(subjectsQuery, params);
 
   // Calculate progression for each subject
   const subjectProgressList = [];
@@ -61,7 +61,7 @@ router.get('/overview', authenticate, (req, res) => {
 
   for (const subj of subjects) {
     try {
-      const p = ProgressionService.calculateSubjectProgress(subj.id, as_of_date);
+      const p = await ProgressionService.calculateSubjectProgress(subj.id, as_of_date);
       subjectProgressList.push(p);
 
       totalHoursInScope += p.hoursInScope;
@@ -102,7 +102,7 @@ router.get('/overview', authenticate, (req, res) => {
   let upcomingExams = [];
   if (semIds.length > 0) {
     const placeholders = semIds.map(() => '?').join(',');
-    upcomingExams = db.query(`
+    upcomingExams = await db.query(`
       SELECT ew.*, sem.name as semester_name, sem.batch_name
       FROM exam_windows ew
       JOIN semesters sem ON ew.semester_id = sem.id
@@ -111,8 +111,10 @@ router.get('/overview', authenticate, (req, res) => {
     `, semIds);
   }
 
+  const activeToday = await ProgressionService.getToday(as_of_date);
+
   res.json({
-    asOfDate: ProgressionService.getToday(as_of_date),
+    asOfDate: activeToday,
     filtersApplied: {
       campus_id: campus_id || null,
       track_id: track_id || null,

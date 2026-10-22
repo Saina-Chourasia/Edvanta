@@ -15,16 +15,18 @@ describe('Phase 3: WhatsApp Business Platform Integration Tests', () => {
   let adminToken;
   let facultyToken;
   let studentToken;
-
-  const adminUser = db.get("SELECT id, name, role FROM users WHERE role = 'ADMIN' LIMIT 1");
-  const facultyUser = db.get("SELECT id, name, role FROM users WHERE role = 'FACULTY' LIMIT 1");
-  const studentUser = db.get("SELECT id, name, role, batch_name FROM users WHERE role = 'STUDENT' LIMIT 1");
+  let adminUser;
+  let facultyUser;
+  let studentUser;
 
   const testPhonePrefix = `+9198${Date.now().toString().slice(-6)}`;
   const testPhoneStudent = `${testPhonePrefix}1`;
   const testPhoneFaculty = `${testPhonePrefix}2`;
 
   before(async () => {
+    adminUser = await db.get("SELECT id, name, role FROM users WHERE role = 'ADMIN' LIMIT 1");
+    facultyUser = await db.get("SELECT id, name, role FROM users WHERE role = 'FACULTY' LIMIT 1");
+    studentUser = await db.get("SELECT id, name, role, batch_name FROM users WHERE role = 'STUDENT' LIMIT 1");
     await new Promise((resolve) => {
       server = app.listen(0, () => {
         const port = server.address().port;
@@ -144,12 +146,12 @@ describe('Phase 3: WhatsApp Business Platform Integration Tests', () => {
     assert.ok(data.dev_code && /^\d{6}$/.test(data.dev_code));
   });
 
-  test('Verification code requests are rate-limited (max 5 per 15 minutes)', () => {
+  test('Verification code requests are rate-limited (max 5 per 15 minutes)', async () => {
     const userId = studentUser.id;
     let rateLimited = false;
     for (let i = 0; i < 7; i++) {
       try {
-        WhatsAppService.requestVerificationCode(userId, testPhoneStudent);
+        await WhatsAppService.requestVerificationCode(userId, testPhoneStudent);
       } catch (err) {
         if (err.status === 429) {
           rateLimited = true;
@@ -180,23 +182,23 @@ describe('Phase 3: WhatsApp Business Platform Integration Tests', () => {
     assert.match(data.error, /invalid or already used/i);
   });
 
-  test('Rejects expired verification code', () => {
+  test('Rejects expired verification code', async () => {
     const expiredOtp = '999111';
     const codeHash = crypto.createHash('sha256').update(expiredOtp).digest('hex');
     const codeId = `wa_exp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    db.run(`
+    await db.run(`
       INSERT INTO whatsapp_link_codes (id, user_id, phone_number, code_hash, expires_at, used)
       VALUES (?, ?, ?, ?, ?, 0)
     `, [codeId, studentUser.id, testPhoneStudent, codeHash, Date.now() - 5000]); // Expired 5 seconds ago
 
-    assert.throws(() => {
-      WhatsAppService.verifyAndLink(studentUser.id, testPhoneStudent, expiredOtp);
+    await assert.rejects(async () => {
+      await WhatsAppService.verifyAndLink(studentUser.id, testPhoneStudent, expiredOtp);
     }, /expired/i);
   });
 
   test('Valid code successfully links WhatsApp phone number to student account', async () => {
-    const codeRes = WhatsAppService.requestVerificationCode(studentUser.id, testPhoneStudent);
+    const codeRes = await WhatsAppService.requestVerificationCode(studentUser.id, testPhoneStudent);
     const validCode = codeRes.dev_code;
 
     const res = await fetch(`${baseUrl}/api/whatsapp/verify`, {
@@ -223,36 +225,36 @@ describe('Phase 3: WhatsApp Business Platform Integration Tests', () => {
     assert.strictEqual(statusData.preferences.notifications_enabled, true);
   });
 
-  test('Rejects reuse of an already used verification code', () => {
-    const codeRes = WhatsAppService.requestVerificationCode(facultyUser.id, testPhoneFaculty);
+  test('Rejects reuse of an already used verification code', async () => {
+    const codeRes = await WhatsAppService.requestVerificationCode(facultyUser.id, testPhoneFaculty);
     const validCode = codeRes.dev_code;
 
     // First use: succeeds
-    const linkRes = WhatsAppService.verifyAndLink(facultyUser.id, testPhoneFaculty, validCode);
+    const linkRes = await WhatsAppService.verifyAndLink(facultyUser.id, testPhoneFaculty, validCode);
     assert.strictEqual(linkRes.success, true);
 
     // Second use: must be rejected
-    assert.throws(() => {
-      WhatsAppService.verifyAndLink(facultyUser.id, testPhoneFaculty, validCode);
+    await assert.rejects(async () => {
+      await WhatsAppService.verifyAndLink(facultyUser.id, testPhoneFaculty, validCode);
     }, /invalid or already used/i);
   });
 
   // -------------------------------------------------------------
   // Test 6: Duplicate Linking Prevention
   // -------------------------------------------------------------
-  test('Prevents linking same phone number to another account', () => {
+  test('Prevents linking same phone number to another account', async () => {
     // testPhoneStudent is already linked to studentUser
-    assert.throws(() => {
-      WhatsAppService.requestVerificationCode(adminUser.id, testPhoneStudent);
+    await assert.rejects(async () => {
+      await WhatsAppService.requestVerificationCode(adminUser.id, testPhoneStudent);
     }, /already linked to another EDVANTA account/i);
   });
 
-  test('Prevents user from linking multiple phone numbers simultaneously', () => {
+  test('Prevents user from linking multiple phone numbers simultaneously', async () => {
     // studentUser is already linked to testPhoneStudent
     const extraPhone = `${testPhonePrefix}9`;
-    const codeRes = WhatsAppService.requestVerificationCode(studentUser.id, extraPhone);
-    assert.throws(() => {
-      WhatsAppService.verifyAndLink(studentUser.id, extraPhone, codeRes.dev_code);
+    const codeRes = await WhatsAppService.requestVerificationCode(studentUser.id, extraPhone);
+    await assert.rejects(async () => {
+      await WhatsAppService.verifyAndLink(studentUser.id, extraPhone, codeRes.dev_code);
     }, /already linked to another phone number/i);
   });
 

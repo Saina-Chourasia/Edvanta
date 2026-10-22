@@ -13,12 +13,14 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
   let adminToken;
   let facultyToken;
   let studentToken;
-
-  const adminUser = db.get("SELECT id, name, role FROM users WHERE role = 'ADMIN' LIMIT 1");
-  const facultyUser = db.get("SELECT id, name, role FROM users WHERE role = 'FACULTY' LIMIT 1");
-  const studentUser = db.get("SELECT id, name, role, batch_name FROM users WHERE role = 'STUDENT' LIMIT 1");
+  let adminUser;
+  let facultyUser;
+  let studentUser;
 
   before(async () => {
+    adminUser = await db.get("SELECT id, name, role FROM users WHERE role = 'ADMIN' LIMIT 1");
+    facultyUser = await db.get("SELECT id, name, role FROM users WHERE role = 'FACULTY' LIMIT 1");
+    studentUser = await db.get("SELECT id, name, role, batch_name FROM users WHERE role = 'STUDENT' LIMIT 1");
     await new Promise((resolve) => {
       server = app.listen(0, () => {
         const port = server.address().port;
@@ -112,13 +114,13 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
     assert.ok(new Date(data.expires_at) > new Date());
   });
 
-  test('Linking code generation is rate-limited per user', () => {
+  test('Linking code generation is rate-limited per user', async () => {
     const userId = studentUser.id;
     // Exceed rate limit of 5 requests
     let hitLimit = false;
     for (let i = 0; i < 7; i++) {
       try {
-        TelegramService.generateLinkCode(userId);
+        await TelegramService.generateLinkCode(userId);
       } catch (err) {
         if (err.status === 429) {
           hitLimit = true;
@@ -134,30 +136,30 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
   // -------------------------------------------------------------
   // Test 4: Account Linking Validation (Expired, Invalid, Reused)
   // -------------------------------------------------------------
-  test('Rejects invalid linking code', () => {
-    const result = TelegramService.linkAccount('test_chat_9001', 'NONEXISTENT_CODE');
+  test('Rejects invalid linking code', async () => {
+    const result = await TelegramService.linkAccount('test_chat_9001', 'NONEXISTENT_CODE');
     assert.strictEqual(result.success, false);
     assert.match(result.error, /invalid or already used/i);
   });
 
-  test('Rejects expired linking code', () => {
+  test('Rejects expired linking code', async () => {
     const expiredCode = `EDVEXP_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const expiredHash = TelegramService.hashCode(expiredCode);
     const codeId = `tg_code_exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    db.run(`
+    await db.run(`
       INSERT INTO telegram_link_codes (id, user_id, code_hash, expires_at, used)
       VALUES (?, ?, ?, ?, 0)
     `, [codeId, studentUser.id, expiredHash, Date.now() - 5000]); // Expired 5 seconds ago
 
-    const result = TelegramService.linkAccount('test_chat_9002', expiredCode);
+    const result = await TelegramService.linkAccount('test_chat_9002', expiredCode);
     assert.strictEqual(result.success, false);
     assert.match(result.error, /expired/i);
   });
 
-  test('Valid linking code successfully binds Telegram chat_id to user', () => {
-    const linkCodeData = TelegramService.generateLinkCode(studentUser.id);
-    const result = TelegramService.linkAccount('test_chat_student_1', linkCodeData.code, {
+  test('Valid linking code successfully binds Telegram chat_id to user', async () => {
+    const linkCodeData = await TelegramService.generateLinkCode(studentUser.id);
+    const result = await TelegramService.linkAccount('test_chat_student_1', linkCodeData.code, {
       username: 'aarav_mehta',
       first_name: 'Aarav'
     });
@@ -167,36 +169,36 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
     assert.strictEqual(result.user.role, 'STUDENT');
 
     // Verify record in database
-    const link = db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_student_1']);
+    const link = await db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_student_1']);
     assert.ok(link);
     assert.strictEqual(link.user_id, studentUser.id);
     assert.strictEqual(link.telegram_username, 'aarav_mehta');
   });
 
-  test('Rejects reuse of an already used linking code', () => {
-    const linkCodeData = TelegramService.generateLinkCode(facultyUser.id);
+  test('Rejects reuse of an already used linking code', async () => {
+    const linkCodeData = await TelegramService.generateLinkCode(facultyUser.id);
     // First use
-    const res1 = TelegramService.linkAccount('test_chat_fac_1', linkCodeData.code);
+    const res1 = await TelegramService.linkAccount('test_chat_fac_1', linkCodeData.code);
     assert.strictEqual(res1.success, true);
 
     // Second use with same code
-    const res2 = TelegramService.linkAccount('test_chat_fac_2', linkCodeData.code);
+    const res2 = await TelegramService.linkAccount('test_chat_fac_2', linkCodeData.code);
     assert.strictEqual(res2.success, false);
     assert.match(res2.error, /invalid or already used/i);
   });
 
-  test('Rejects duplicate linking: Same Telegram chat linking to another user', () => {
-    const codeData = TelegramService.generateLinkCode(adminUser.id);
+  test('Rejects duplicate linking: Same Telegram chat linking to another user', async () => {
+    const codeData = await TelegramService.generateLinkCode(adminUser.id);
     // test_chat_student_1 is already linked to studentUser
-    const result = TelegramService.linkAccount('test_chat_student_1', codeData.code);
+    const result = await TelegramService.linkAccount('test_chat_student_1', codeData.code);
     assert.strictEqual(result.success, false);
     assert.match(result.error, /already linked/i);
   });
 
-  test('Rejects duplicate linking: Same EDVANTA user linking a second Telegram chat', () => {
+  test('Rejects duplicate linking: Same EDVANTA user linking a second Telegram chat', async () => {
     // studentUser is already linked to test_chat_student_1
-    const codeData = TelegramService.generateLinkCode(studentUser.id);
-    const result = TelegramService.linkAccount('test_chat_student_extra', codeData.code);
+    const codeData = await TelegramService.generateLinkCode(studentUser.id);
+    const result = await TelegramService.linkAccount('test_chat_student_extra', codeData.code);
     assert.strictEqual(result.success, false);
     assert.match(result.error, /already linked to another Telegram account/i);
   });
@@ -324,7 +326,7 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
       assert.match(sentMessage, /Account Unlinked/i);
 
       // Verify unlinked in DB
-      const link = db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_fac_1']);
+      const link = await db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_fac_1']);
       assert.strictEqual(link, null);
     } finally {
       TelegramService.sendMessage = origSend;
@@ -340,7 +342,7 @@ describe('Phase 2: Telegram Academic Bot Integration Tests', () => {
     const data = await res.json();
     assert.strictEqual(data.success, true);
 
-    const link = db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_student_1']);
+    const link = await db.get('SELECT * FROM telegram_links WHERE telegram_chat_id = ?', ['test_chat_student_1']);
     assert.strictEqual(link, null);
   });
 

@@ -11,9 +11,9 @@ const router = Router();
  * GET /api/telegram/status
  * Check user's Telegram link status and bot configuration without exposing secrets
  */
-router.get('/status', authenticate, (req, res) => {
+router.get('/status', authenticate, async (req, res) => {
   try {
-    const status = TelegramService.getLinkStatus(req.user.id);
+    const status = await TelegramService.getLinkStatus(req.user.id);
     res.json(status);
   } catch (err) {
     res.status(500).json({ error: `Failed to retrieve Telegram status: ${err.message}` });
@@ -24,9 +24,9 @@ router.get('/status', authenticate, (req, res) => {
  * POST /api/telegram/link-code
  * Generate a 10-minute one-time linking code for the authenticated user
  */
-router.post('/link-code', authenticate, (req, res) => {
+router.post('/link-code', authenticate, async (req, res) => {
   try {
-    const linkCodeData = TelegramService.generateLinkCode(req.user.id);
+    const linkCodeData = await TelegramService.generateLinkCode(req.user.id);
     res.status(201).json(linkCodeData);
   } catch (err) {
     const status = err.status || 500;
@@ -38,9 +38,9 @@ router.post('/link-code', authenticate, (req, res) => {
  * POST /api/telegram/unlink
  * Unlink the authenticated user's Telegram account
  */
-router.post('/unlink', authenticate, (req, res) => {
+router.post('/unlink', authenticate, async (req, res) => {
   try {
-    const result = TelegramService.unlinkByUserId(req.user.id);
+    const result = await TelegramService.unlinkByUserId(req.user.id);
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }

@@ -10,7 +10,7 @@ import ProgressionService from '../services/progression.service.js';
 const router = Router();
 
 // Get subjects list
-router.get('/subjects', (req, res) => {
+router.get('/subjects', async (req, res) => {
   const { semester_id, campus_id, track_id, faculty_id } = req.query;
   let sql = `
     SELECT s.*, c.name as campus_name, t.name as track_name, sem.name as semester_name,
@@ -30,26 +30,34 @@ router.get('/subjects', (req, res) => {
   if (faculty_id) { sql += ` AND s.faculty_id = ?`; params.push(faculty_id); }
 
   sql += ` ORDER BY s.code ASC`;
-  const subjects = db.query(sql, params);
-  res.json({ subjects });
+  try {
+    const subjects = await db.query(sql, params);
+    res.json({ subjects });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get topics for a specific subject
-router.get('/subjects/:id/topics', (req, res) => {
+router.get('/subjects/:id/topics', async (req, res) => {
   const subjectId = req.params.id;
-  const topics = db.query(`
-    SELECT lp.*, s.code as subject_code, s.name as subject_name
-    FROM lesson_plans lp
-    JOIN subjects s ON lp.subject_id = s.id
-    WHERE lp.subject_id = ?
-    ORDER BY lp.sequence_order ASC
-  `, [subjectId]);
+  try {
+    const topics = await db.query(`
+      SELECT lp.*, s.code as subject_code, s.name as subject_name
+      FROM lesson_plans lp
+      JOIN subjects s ON lp.subject_id = s.id
+      WHERE lp.subject_id = ?
+      ORDER BY lp.sequence_order ASC
+    `, [subjectId]);
 
-  res.json({ topics });
+    res.json({ topics });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add topic to subject (Admin or Assigned Faculty)
-router.post('/subjects/:id/topics', authenticate, requireSubjectAccess('id'), (req, res) => {
+router.post('/subjects/:id/topics', authenticate, requireSubjectAccess('id'), async (req, res) => {
   const subjectId = req.params.id;
   const {
     unit_number,
@@ -74,13 +82,13 @@ router.post('/subjects/:id/topics', authenticate, requireSubjectAccess('id'), (r
   const topicId = `lp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
   try {
-    db.run(`
+    await db.run(`
       INSERT INTO lesson_plans (id, subject_id, unit_number, unit_name, topic_number, topic_title, description, planned_hours, sequence_order, exam_scope, status, completion_percentage)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_STARTED', 0)
     `, [topicId, subjectId, unit_number, unit_name, topic_number || sequence_order, topic_title, description, hours, sequence_order, exam_scope]);
 
     // Recalculate planned dates
-    ProgressionService.generatePlannedTopicDates(subjectId);
+    await ProgressionService.generatePlannedTopicDates(subjectId);
 
     res.status(201).json({ id: topicId, message: 'Topic created and syllabus timeline recalculated.' });
   } catch (err) {
@@ -89,13 +97,13 @@ router.post('/subjects/:id/topics', authenticate, requireSubjectAccess('id'), (r
 });
 
 // Update topic status / completion (Admin or Assigned Faculty)
-router.patch('/topics/:id', authenticate, (req, res) => {
-  const topic = db.get(`SELECT * FROM lesson_plans WHERE id = ?`, [req.params.id]);
+router.patch('/topics/:id', authenticate, async (req, res) => {
+  const topic = await db.get(`SELECT * FROM lesson_plans WHERE id = ?`, [req.params.id]);
   if (!topic) {
     return res.status(404).json({ error: 'Topic not found.' });
   }
 
-  const subject = db.get(`SELECT campus_id, faculty_id FROM subjects WHERE id = ?`, [topic.subject_id]);
+  const subject = await db.get(`SELECT campus_id, faculty_id FROM subjects WHERE id = ?`, [topic.subject_id]);
   if (!subject) {
     return res.status(404).json({ error: 'Subject not found.' });
   }
@@ -144,23 +152,27 @@ router.patch('/topics/:id', authenticate, (req, res) => {
     updateActualDate = actual_date;
   }
 
-  db.run(`
-    UPDATE lesson_plans
-    SET status = ?, completion_percentage = ?, actual_date = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `, [updateStatus, updatePct, updateActualDate, topic.id]);
+  try {
+    await db.run(`
+      UPDATE lesson_plans
+      SET status = ?, completion_percentage = ?, actual_date = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [updateStatus, updatePct, updateActualDate, topic.id]);
 
-  // Recalculate planned dates for any cascading shifts
-  ProgressionService.generatePlannedTopicDates(topic.subject_id);
+    // Recalculate planned dates for any cascading shifts
+    await ProgressionService.generatePlannedTopicDates(topic.subject_id);
 
-  res.json({ message: 'Topic updated and progression refreshed.' });
+    res.json({ message: 'Topic updated and progression refreshed.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Force recalculate planned dates for a subject
-router.post('/subjects/:id/recalculate', authenticate, (req, res) => {
+router.post('/subjects/:id/recalculate', authenticate, async (req, res) => {
   try {
-    ProgressionService.generatePlannedTopicDates(req.params.id);
-    const progress = ProgressionService.calculateSubjectProgress(req.params.id);
+    await ProgressionService.generatePlannedTopicDates(req.params.id);
+    const progress = await ProgressionService.calculateSubjectProgress(req.params.id);
     res.json({ message: 'Progression dates successfully recalculated.', progress });
   } catch (err) {
     res.status(500).json({ error: err.message });

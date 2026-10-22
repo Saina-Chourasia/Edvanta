@@ -30,6 +30,7 @@ import aiRoutes from './routes/ai.routes.js';
 import telegramRoutes from './routes/telegram.routes.js';
 import TelegramService from './services/telegram.service.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
+import { db } from './database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,13 +48,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Health Check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    system: 'EDVANTA Course Progression Tracker',
-    tagline: 'Every Hour Counts, Every Goal Matters',
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    const isHealthy = await db.checkHealth();
+    res.json({
+      status: isHealthy ? 'healthy' : 'degraded',
+      engine: db.isPostgres ? 'postgresql' : 'sqlite',
+      system: 'EDVANTA Course Progression Tracker',
+      tagline: 'Every Hour Counts, Every Goal Matters',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'unhealthy',
+      engine: db.isPostgres ? 'postgresql' : 'sqlite',
+      error: err.message
+    });
+  }
 });
 
 // REST API Routes
@@ -89,14 +100,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-if (process.env.NODE_ENV !== 'test') {
+// Start server when executed directly as a standalone process (not on Vercel Serverless or testing)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`🚀 EDVANTA Course Progression Tracker is Live!`);
     console.log(`🎯 Tagline: Every Hour Counts, Every Goal Matters.`);
     console.log(`🌐 URL: http://localhost:${PORT}`);
     console.log(`📡 REST API Health: http://localhost:${PORT}/api/health`);
+    console.log(`🗄️ Database Engine: ${db.isPostgres ? 'Neon Serverless PostgreSQL (Verified)' : 'Native SQLite (DatabaseSync)'}`);
     console.log(`====================================================`);
     // Initialize Telegram Bot polling if explicitly enabled in environment
     TelegramService.startPolling();

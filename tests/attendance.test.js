@@ -56,10 +56,10 @@ describe('Requirement 11: Real Attendance Management System', () => {
     otherFacultyToken = (await mathRes.json()).token;
   });
 
-  after(() => {
+  after(async () => {
     if (activeSessionId) {
-      db.run(`DELETE FROM attendance_records WHERE attendance_session_id = ?`, [activeSessionId]);
-      db.run(`DELETE FROM attendance_sessions WHERE id = ?`, [activeSessionId]);
+      await db.run(`DELETE FROM attendance_records WHERE attendance_session_id = ?`, [activeSessionId]);
+      await db.run(`DELETE FROM attendance_sessions WHERE id = ?`, [activeSessionId]);
     }
     if (server) server.close();
   });
@@ -221,7 +221,7 @@ describe('Requirement 11: Real Attendance Management System', () => {
     assert.equal(closeRes.status, 200);
 
     // Verify session is closed in DB
-    const sess = db.get(`SELECT is_active FROM attendance_sessions WHERE id = ?`, [activeSessionId]);
+    const sess = await db.get(`SELECT is_active FROM attendance_sessions WHERE id = ?`, [activeSessionId]);
     assert.equal(sess.is_active, 0);
 
     // Student attempt to submit after closure
@@ -286,7 +286,7 @@ describe('Requirement 11: Real Attendance Management System', () => {
     assert.equal(data.marking_method, 'BLUETOOTH');
 
     // Verify record in database has marking_method = 'BLUETOOTH'
-    const rec = db.get(`SELECT * FROM attendance_records WHERE id = ?`, [data.recordId]);
+    const rec = await db.get(`SELECT * FROM attendance_records WHERE id = ?`, [data.recordId]);
     assert.equal(rec.marking_method, 'BLUETOOTH');
   });
 
@@ -351,12 +351,12 @@ describe('Requirement 11: Real Attendance Management System', () => {
     assert.equal(data.success, true);
 
     // Verify session is closed
-    const sess = db.get(`SELECT is_active FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
+    const sess = await db.get(`SELECT is_active FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
     assert.equal(sess.is_active, 0);
 
     // Clean up test data
-    db.run(`DELETE FROM attendance_records WHERE attendance_session_id = ?`, [bleSessionId]);
-    db.run(`DELETE FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
+    await db.run(`DELETE FROM attendance_records WHERE attendance_session_id = ?`, [bleSessionId]);
+    await db.run(`DELETE FROM attendance_sessions WHERE id = ?`, [bleSessionId]);
   });
 
   // 17. Attendance dashboard summary metrics

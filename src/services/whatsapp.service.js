@@ -132,12 +132,12 @@ class WhatsAppService {
    * Request a 6-digit WhatsApp verification code
    * Valid for 10 minutes.
    */
-  static requestVerificationCode(userId, inputPhone) {
+  static async requestVerificationCode(userId, inputPhone) {
     if (!userId) {
       throw new Error('User ID is required.');
     }
 
-    const user = db.get('SELECT id, name, role FROM users WHERE id = ?', [userId]);
+    const user = await db.get('SELECT id, name, role FROM users WHERE id = ?', [userId]);
     if (!user) {
       const err = new Error('User not found.');
       err.status = 404;
@@ -147,7 +147,7 @@ class WhatsAppService {
     const phone = this.normalizePhoneNumber(inputPhone);
 
     // Prevent linking if phone is already linked to another user
-    const existingPhoneLink = db.get('SELECT user_id FROM whatsapp_links WHERE phone_number = ?', [phone]);
+    const existingPhoneLink = await db.get('SELECT user_id FROM whatsapp_links WHERE phone_number = ?', [phone]);
     if (existingPhoneLink && existingPhoneLink.user_id !== userId) {
       const err = new Error('This phone number is already linked to another EDVANTA account.');
       err.status = 409;
@@ -167,10 +167,10 @@ class WhatsAppService {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
     // Invalidate previous unused codes for this user
-    db.run('UPDATE whatsapp_link_codes SET used = 1 WHERE user_id = ? AND used = 0', [userId]);
+    await db.run('UPDATE whatsapp_link_codes SET used = 1 WHERE user_id = ? AND used = 0', [userId]);
 
     const codeId = `wa_code_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    db.run(`
+    await db.run(`
       INSERT INTO whatsapp_link_codes (id, user_id, phone_number, code_hash, expires_at, used)
       VALUES (?, ?, ?, ?, ?, 0)
     `, [codeId, userId, phone, codeHash, expiresAt]);
@@ -193,7 +193,7 @@ class WhatsAppService {
   /**
    * Verify code and link WhatsApp phone number to user account
    */
-  static verifyAndLink(userId, inputPhone, inputCode) {
+  static async verifyAndLink(userId, inputPhone, inputCode) {
     if (!userId || !inputPhone || !inputCode) {
       const err = new Error('User ID, phone number, and verification code are required.');
       err.status = 400;
@@ -217,7 +217,7 @@ class WhatsAppService {
 
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
 
-    const record = db.get(`
+    const record = await db.get(`
       SELECT * FROM whatsapp_link_codes
       WHERE user_id = ? AND phone_number = ? AND code_hash = ? AND used = 0
     `, [userId, phone, codeHash]);
@@ -229,14 +229,14 @@ class WhatsAppService {
     }
 
     if (Date.now() > record.expires_at) {
-      db.run('UPDATE whatsapp_link_codes SET used = 1 WHERE id = ?', [record.id]);
+      await db.run('UPDATE whatsapp_link_codes SET used = 1 WHERE id = ?', [record.id]);
       const err = new Error('Verification code has expired. Please request a new code.');
       err.status = 400;
       throw err;
     }
 
     // Check if phone number is already linked to another account
-    const existingPhone = db.get('SELECT user_id FROM whatsapp_links WHERE phone_number = ?', [phone]);
+    const existingPhone = await db.get('SELECT user_id FROM whatsapp_links WHERE phone_number = ?', [phone]);
     if (existingPhone && existingPhone.user_id !== userId) {
       const err = new Error('This phone number is already linked to another EDVANTA account.');
       err.status = 409;
@@ -244,7 +244,7 @@ class WhatsAppService {
     }
 
     // Check if user already has a linked WhatsApp number
-    const existingUser = db.get('SELECT phone_number FROM whatsapp_links WHERE user_id = ?', [userId]);
+    const existingUser = await db.get('SELECT phone_number FROM whatsapp_links WHERE user_id = ?', [userId]);
     if (existingUser && existingUser.phone_number !== phone) {
       const err = new Error('Your EDVANTA account is already linked to another phone number. Unlink it first.');
       err.status = 409;
@@ -253,9 +253,9 @@ class WhatsAppService {
 
     const linkId = `wa_link_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
 
-    db.transaction(() => {
-      db.run('UPDATE whatsapp_link_codes SET used = 1 WHERE id = ?', [record.id]);
-      db.run(`
+    await db.transaction(async (tx) => {
+      await tx.run('UPDATE whatsapp_link_codes SET used = 1 WHERE id = ?', [record.id]);
+      await tx.run(`
         INSERT INTO whatsapp_links (id, user_id, phone_number, verified_at, notifications_enabled, notify_attendance, notify_schedule, notify_progress)
         VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 1, 1, 1)
         ON CONFLICT(user_id) DO UPDATE SET
@@ -265,7 +265,7 @@ class WhatsAppService {
       `, [linkId, userId, phone]);
     });
 
-    const link = db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
+    const link = await db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
     return {
       success: true,
       link: {
@@ -281,12 +281,12 @@ class WhatsAppService {
   /**
    * Get WhatsApp link status and notification preferences for a user
    */
-  static getLinkStatus(userId) {
+  static async getLinkStatus(userId) {
     if (!userId) {
       return { is_linked: false, configured: false };
     }
 
-    const link = db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
+    const link = await db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
     const { isConfigured, businessAccountId, phoneNumberId } = this.getConfig();
 
     if (!link) {
@@ -314,8 +314,8 @@ class WhatsAppService {
   /**
    * Update notification consent preferences
    */
-  static updatePreferences(userId, prefs = {}) {
-    const link = db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
+  static async updatePreferences(userId, prefs = {}) {
+    const link = await db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
     if (!link) {
       const err = new Error('No WhatsApp account linked.');
       err.status = 404;
@@ -327,27 +327,27 @@ class WhatsAppService {
     const notify_schedule = prefs.notify_schedule !== undefined ? (prefs.notify_schedule ? 1 : 0) : link.notify_schedule;
     const notify_progress = prefs.notify_progress !== undefined ? (prefs.notify_progress ? 1 : 0) : link.notify_progress;
 
-    db.run(`
+    await db.run(`
       UPDATE whatsapp_links
       SET notifications_enabled = ?, notify_attendance = ?, notify_schedule = ?, notify_progress = ?
       WHERE user_id = ?
     `, [notifications_enabled, notify_attendance, notify_schedule, notify_progress, userId]);
 
-    return this.getLinkStatus(userId);
+    return await this.getLinkStatus(userId);
   }
 
   /**
    * Unlink WhatsApp account
    */
-  static unlink(userId) {
-    const link = db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
+  static async unlink(userId) {
+    const link = await db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
     if (!link) {
       const err = new Error('No WhatsApp account currently linked.');
       err.status = 404;
       throw err;
     }
 
-    db.run('DELETE FROM whatsapp_links WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM whatsapp_links WHERE user_id = ?', [userId]);
     return { success: true, message: 'WhatsApp account unlinked successfully.' };
   }
 
@@ -370,7 +370,7 @@ class WhatsAppService {
     // SAFETY CHECK: During tests or when unconfigured, never make real external HTTP calls
     if (process.env.NODE_ENV === 'test' || !isConfigured) {
       const logId = `wa_log_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-      db.run(`
+      await db.run(`
         INSERT INTO whatsapp_logs (id, user_id, phone_number, message_type, status, message_id, payload)
         VALUES (?, ?, ?, ?, 'SIMULATED', ?, ?)
       `, [logId, userId, normalizedPhone, messageType, `sim_msg_${Date.now()}`, text || templateName]);
@@ -434,7 +434,7 @@ class WhatsAppService {
       const logId = `wa_log_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
       if (!res.ok) {
         const errorDesc = data.error?.message || `HTTP ${res.status}`;
-        db.run(`
+        await db.run(`
           INSERT INTO whatsapp_logs (id, user_id, phone_number, message_type, status, payload)
           VALUES (?, ?, ?, ?, 'FAILED', ?)
         `, [logId, userId, normalizedPhone, messageType, errorDesc]);
@@ -442,7 +442,7 @@ class WhatsAppService {
       }
 
       const messageId = data.messages?.[0]?.id || `wamid_${Date.now()}`;
-      db.run(`
+      await db.run(`
         INSERT INTO whatsapp_logs (id, user_id, phone_number, message_type, status, message_id, payload)
         VALUES (?, ?, ?, ?, 'SENT', ?, ?)
       `, [logId, userId, normalizedPhone, messageType, messageId, text || templateName]);
@@ -464,10 +464,10 @@ class WhatsAppService {
   static async sendAcademicAlert(userId, alertCategory, alertData = {}) {
     if (!userId) return { sent: false, reason: 'User ID is required.' };
 
-    const user = db.get('SELECT id, name, role, batch_name FROM users WHERE id = ?', [userId]);
+    const user = await db.get('SELECT id, name, role, batch_name FROM users WHERE id = ?', [userId]);
     if (!user) return { sent: false, reason: 'User not found.' };
 
-    const link = db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
+    const link = await db.get('SELECT * FROM whatsapp_links WHERE user_id = ?', [userId]);
     if (!link) return { sent: false, reason: 'User does not have a linked WhatsApp number.' };
     if (!link.notifications_enabled) return { sent: false, reason: 'User has disabled WhatsApp notifications.' };
 

@@ -29,7 +29,7 @@ router.post('/login', async (req, res) => {
       ? digitsOnly.slice(2)
       : (digitsOnly.length === 10 ? digitsOnly : inputId);
 
-    const user = db.get(`
+    const user = await db.get(`
       SELECT u.*, c.name as campus_name
       FROM users u
       LEFT JOIN campuses c ON u.campus_id = c.id
@@ -46,7 +46,9 @@ router.post('/login', async (req, res) => {
     }
 
     const token = generateToken(user);
-    res.setHeader('Set-Cookie', `edvanta_token=${token}; Path=/; SameSite=Lax; Max-Age=604800`);
+    const isProd = process.env.NODE_ENV === 'production';
+    const secureFlag = isProd ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `edvanta_token=${token}; Path=/; SameSite=Lax${secureFlag}; Max-Age=604800`);
     res.json({
       token,
       user: {
@@ -67,7 +69,7 @@ router.post('/login', async (req, res) => {
 });
 
 // 1b. Phone OTP Authentication (Send & Verify)
-router.post('/otp/send', (req, res) => {
+router.post('/otp/send', async (req, res) => {
   try {
     const { phone } = req.body;
     if (!phone) {
@@ -83,7 +85,7 @@ router.post('/otp/send', (req, res) => {
     }
 
     // Look up user with normalized phone or exact phone
-    const user = db.get(`
+    const user = await db.get(`
       SELECT id, name, phone, role
       FROM users
       WHERE phone = ? OR phone = ?
@@ -114,7 +116,7 @@ router.post('/otp/send', (req, res) => {
   }
 });
 
-router.post('/otp/verify', (req, res) => {
+router.post('/otp/verify', async (req, res) => {
   try {
     const { phone, code } = req.body;
     if (!phone || !code) {
@@ -142,7 +144,7 @@ router.post('/otp/verify', (req, res) => {
     // Code verified
     phoneOtpStore.delete(normalizedPhone);
 
-    const user = db.get(`
+    const user = await db.get(`
       SELECT u.*, c.name as campus_name
       FROM users u
       LEFT JOIN campuses c ON u.campus_id = c.id
@@ -154,7 +156,9 @@ router.post('/otp/verify', (req, res) => {
     }
 
     const token = generateToken(user);
-    res.setHeader('Set-Cookie', `edvanta_token=${token}; Path=/; SameSite=Lax; Max-Age=604800`);
+    const isProd = process.env.NODE_ENV === 'production';
+    const secureFlag = isProd ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `edvanta_token=${token}; Path=/; SameSite=Lax${secureFlag}; Max-Age=604800`);
     res.json({
       token,
       user: {
@@ -186,7 +190,7 @@ router.post('/change-password', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
     }
 
-    const user = db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id]);
+    const user = await db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id]);
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
@@ -197,7 +201,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, user.id]);
+    await db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, user.id]);
 
     res.json({ message: 'Password changed successfully.' });
   } catch (err) {
@@ -221,14 +225,14 @@ router.post('/users', authenticate, requireRole('ADMIN'), async (req, res) => {
     }
 
     // Check unique email
-    const existingEmail = db.get(`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, [email.trim()]);
+    const existingEmail = await db.get(`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, [email.trim()]);
     if (existingEmail) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
 
     // Check unique phone if provided
     if (phone) {
-      const existingPhone = db.get(`SELECT id FROM users WHERE phone = ?`, [phone.trim()]);
+      const existingPhone = await db.get(`SELECT id FROM users WHERE phone = ?`, [phone.trim()]);
       if (existingPhone) {
         return res.status(409).json({ error: 'An account with this phone number already exists.' });
       }
@@ -237,7 +241,7 @@ router.post('/users', authenticate, requireRole('ADMIN'), async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const userId = `usr_${role.toLowerCase().slice(0, 3)}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
 
-    db.run(`
+    await db.run(`
       INSERT INTO users (id, email, phone, password_hash, name, role, campus_id, batch_name)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
@@ -276,35 +280,42 @@ router.post('/logout', (req, res) => {
 });
 
 // 5. Get Current Authenticated User Profile
-router.get('/me', authenticate, (req, res) => {
-  const user = db.get(`
-    SELECT u.id, u.email, u.phone, u.name, u.role, u.campus_id, u.batch_name, c.name as campus_name
-    FROM users u
-    LEFT JOIN campuses c ON u.campus_id = c.id
-    WHERE u.id = ?
-  `, [req.user.id]);
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await db.get(`
+      SELECT u.id, u.email, u.phone, u.name, u.role, u.campus_id, u.batch_name, c.name as campus_name
+      FROM users u
+      LEFT JOIN campuses c ON u.campus_id = c.id
+      WHERE u.id = ?
+    `, [req.user.id]);
 
-  if (!user) {
-    return res.status(404).json({ error: 'User not found.' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json({ user });
 });
 
 // 6. Test Suite & Developer Token Generator (Preserved for automated tests)
-router.post('/quick-login', (req, res) => {
+router.post('/quick-login', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Quick-login is disabled in production environments.' });
+  }
   try {
     const { role, userId } = req.body;
 
     let user = null;
     if (userId) {
-      user = db.get(`
+      user = await db.get(`
         SELECT u.*, c.name as campus_name
         FROM users u
         LEFT JOIN campuses c ON u.campus_id = c.id
         WHERE u.id = ?
       `, [userId]);
     } else if (role) {
-      user = db.get(`
+      user = await db.get(`
         SELECT u.*, c.name as campus_name
         FROM users u
         LEFT JOIN campuses c ON u.campus_id = c.id
@@ -338,19 +349,23 @@ router.post('/quick-login', (req, res) => {
 });
 
 // 7. Get users list (for Admin management)
-router.get('/users', authenticate, requireRole('ADMIN'), (req, res) => {
-  const users = db.query(`
-    SELECT u.id, u.email, u.phone, u.name, u.role, u.campus_id, u.batch_name, c.name as campus_name, u.created_at
-    FROM users u
-    LEFT JOIN campuses c ON u.campus_id = c.id
-    ORDER BY CASE u.role
-      WHEN 'ADMIN' THEN 1
-      WHEN 'CAMPUS_MANAGER' THEN 2
-      WHEN 'FACULTY' THEN 3
-      WHEN 'STUDENT' THEN 4
-      ELSE 5 END, u.name ASC
-  `);
-  res.json({ users });
+router.get('/users', authenticate, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const users = await db.query(`
+      SELECT u.id, u.email, u.phone, u.name, u.role, u.campus_id, u.batch_name, c.name as campus_name, u.created_at
+      FROM users u
+      LEFT JOIN campuses c ON u.campus_id = c.id
+      ORDER BY CASE u.role
+        WHEN 'ADMIN' THEN 1
+        WHEN 'CAMPUS_MANAGER' THEN 2
+        WHEN 'FACULTY' THEN 3
+        WHEN 'STUDENT' THEN 4
+        ELSE 5 END, u.name ASC
+    `);
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // -------------------------------------------------------------
@@ -492,7 +507,7 @@ router.get('/google/callback', async (req, res) => {
     }
 
     // 3. Match against authorized MSOT users in the existing database
-    let user = db.get(`
+    let user = await db.get(`
       SELECT u.*, c.name as campus_name
       FROM users u
       LEFT JOIN campuses c ON u.campus_id = c.id
@@ -539,9 +554,9 @@ router.get('/google/callback', async (req, res) => {
         const assignedBatch = assignedRole === 'STUDENT' ? (matched.batch_name || 'Batch-2026-Mirai-A') : null;
 
         // Ensure record exists in SQLite for session & RBAC integrity
-        const existingRecord = db.get(`SELECT id FROM users WHERE LOWER(email) = ?`, [verifiedEmail]);
+        const existingRecord = await db.get(`SELECT id FROM users WHERE LOWER(email) = ?`, [verifiedEmail]);
         if (existingRecord) {
-          user = db.get(`
+          user = await db.get(`
             SELECT u.*, c.name as campus_name
             FROM users u
             LEFT JOIN campuses c ON u.campus_id = c.id
@@ -553,7 +568,7 @@ router.get('/google/callback', async (req, res) => {
           const passwordHash = bcrypt.hashSync(randomSecret, 10);
           const userName = (googleProfile.name || verifiedEmail.split('@')[0] || 'MSOT User').trim();
 
-          db.run(`
+          await db.run(`
             INSERT INTO users (id, email, phone, password_hash, name, role, campus_id, batch_name)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `, [
@@ -567,7 +582,7 @@ router.get('/google/callback', async (req, res) => {
             assignedBatch
           ]);
 
-          user = db.get(`
+          user = await db.get(`
             SELECT u.*, c.name as campus_name
             FROM users u
             LEFT JOIN campuses c ON u.campus_id = c.id
@@ -586,9 +601,11 @@ router.get('/google/callback', async (req, res) => {
     const token = generateToken(user);
 
     // Set edvanta_token session cookie and clear oauth_state
+    const isProd = process.env.NODE_ENV === 'production';
+    const secureFlag = isProd ? '; Secure' : '';
     res.setHeader('Set-Cookie', [
-      `edvanta_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax; Max-Age=604800`,
-      `oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+      `edvanta_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secureFlag}; Max-Age=604800`,
+      `oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag}; Max-Age=0`
     ]);
 
     // Redirect to authenticated app with token parameter for robust browser compatibility

@@ -5,13 +5,13 @@ import ProgressionService from '../src/services/progression.service.js';
 
 test('Portal Flows: Student enrolled subjects and progression contract', async () => {
   // Query student Aarav Mehta
-  const student = db.get("SELECT * FROM users WHERE email = 'student.aarav@edvanta.msot.edu'");
+  const student = await db.get("SELECT * FROM users WHERE email = 'student.aarav@edvanta.msot.edu'");
   assert.ok(student, 'Student Aarav Mehta exists');
   assert.equal(student.role, 'STUDENT');
   assert.equal(student.batch_name, 'Batch-2026-Mirai-A');
 
   // Verify progression calculations for student's batch
-  const subjects = db.query(`
+  const subjects = await db.query(`
     SELECT s.id, s.code, s.name, s.semester_id, u.name as faculty_name
     FROM subjects s
     JOIN semesters sem ON s.semester_id = sem.id
@@ -23,7 +23,7 @@ test('Portal Flows: Student enrolled subjects and progression contract', async (
   assert.ok(subjects.length > 0, 'Student has enrolled subjects');
 
   for (const s of subjects) {
-    const p = ProgressionService.calculateSubjectProgress(s.id, '2026-10-20');
+    const p = await ProgressionService.calculateSubjectProgress(s.id, '2026-10-20');
     assert.ok(p.id, 'Subject has id');
     assert.ok(p.code, 'Subject has code');
     assert.ok(p.name, 'Subject has name');
@@ -36,12 +36,12 @@ test('Portal Flows: Student enrolled subjects and progression contract', async (
 });
 
 test('Portal Flows: Faculty Fast Lesson Logger scheduled sessions on Tuesday', async () => {
-  const faculty = db.get("SELECT * FROM users WHERE email = 'faculty.cs@edvanta.msot.edu'");
+  const faculty = await db.get("SELECT * FROM users WHERE email = 'faculty.cs@edvanta.msot.edu'");
   assert.ok(faculty, 'Faculty Dr. Aris Thorne exists');
   assert.equal(faculty.role, 'FACULTY');
 
   // Query timetable slot on Tuesday (weekday = 2)
-  const tuesdaySlot = db.get(`
+  const tuesdaySlot = await db.get(`
     SELECT ts.*, s.code as subject_code, s.name as subject_name, u.name as faculty_name
     FROM timetable_slots ts
     JOIN subjects s ON ts.subject_id = s.id
@@ -55,7 +55,7 @@ test('Portal Flows: Faculty Fast Lesson Logger scheduled sessions on Tuesday', a
   assert.equal(tuesdaySlot.end_time, '15:50');
 
   // Next topic in syllabus
-  const nextTopic = db.get(`
+  const nextTopic = await db.get(`
     SELECT id, topic_title, status, planned_hours
     FROM lesson_plans
     WHERE subject_id = ? AND status != 'COMPLETED' AND status != 'SKIPPED'
@@ -68,11 +68,11 @@ test('Portal Flows: Faculty Fast Lesson Logger scheduled sessions on Tuesday', a
 });
 
 test('Portal Flows: Exam readiness windows for student semester', async () => {
-  const student = db.get("SELECT * FROM users WHERE email = 'student.aarav@edvanta.msot.edu'");
-  const sem = db.get("SELECT id FROM semesters WHERE batch_name = ?", [student.batch_name]);
+  const student = await db.get("SELECT * FROM users WHERE email = 'student.aarav@edvanta.msot.edu'");
+  const sem = await db.get("SELECT id FROM semesters WHERE batch_name = ?", [student.batch_name]);
   assert.ok(sem, 'Semester exists for student batch');
 
-  const exams = ProgressionService.getExamReadiness(sem.id, null, '2026-10-20');
+  const exams = await ProgressionService.getExamReadiness(sem.id, null, '2026-10-20');
   assert.ok(Array.isArray(exams), 'Exams returns an array');
   assert.ok(exams.length > 0, 'Exams list is not empty');
 

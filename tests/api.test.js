@@ -106,6 +106,11 @@ describe('EDVANTA REST API End-to-End Tests', () => {
     const data = await res.json();
     assert.ok(data.sessionId);
     assert.ok(data.progress);
+
+    // Clean up created test session so test runs remain idempotent
+    if (data.sessionId) {
+      await db.run('DELETE FROM teaching_sessions WHERE id = ?', [data.sessionId]);
+    }
   });
 
   test('POST /api/sessions/log rejects unauthorized faculty trying to log other subjects', async () => {

@@ -8,21 +8,21 @@ import ProgressionService from '../services/progression.service.js';
 
 const router = Router();
 
-router.get('/readiness', authenticate, (req, res) => {
+router.get('/readiness', authenticate, async (req, res) => {
   const { semester_id, subject_id, as_of_date } = req.query;
 
   // Determine target semester(s)
   let targetSemesterId = semester_id;
   if (!targetSemesterId) {
     if (req.user.batch_name) {
-      const studentSem = db.get(`SELECT id FROM semesters WHERE batch_name = ? LIMIT 1`, [req.user.batch_name]);
+      const studentSem = await db.get(`SELECT id FROM semesters WHERE batch_name = ? LIMIT 1`, [req.user.batch_name]);
       if (studentSem) targetSemesterId = studentSem.id;
     }
   }
 
   if (!targetSemesterId) {
     // Default to first active semester
-    const firstActive = db.get(`SELECT id FROM semesters WHERE is_active = 1 LIMIT 1`);
+    const firstActive = await db.get(`SELECT id FROM semesters WHERE is_active = 1 LIMIT 1`);
     if (firstActive) targetSemesterId = firstActive.id;
   }
 
@@ -31,10 +31,11 @@ router.get('/readiness', authenticate, (req, res) => {
   }
 
   try {
-    const exams = ProgressionService.getExamReadiness(targetSemesterId, subject_id, as_of_date);
+    const exams = await ProgressionService.getExamReadiness(targetSemesterId, subject_id, as_of_date);
+    const activeToday = await ProgressionService.getToday(as_of_date);
     res.json({
       semesterId: targetSemesterId,
-      asOfDate: ProgressionService.getToday(as_of_date),
+      asOfDate: activeToday,
       exams,
       examWindows: exams
     });

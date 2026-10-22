@@ -9,9 +9,9 @@ export class ProgressionService {
   /**
    * Fetch current system thresholds or defaults
    */
-  static getThresholds() {
-    const onTrackSetting = db.get("SELECT value FROM system_settings WHERE key = 'buffer_ratio_on_track'");
-    const tightSetting = db.get("SELECT value FROM system_settings WHERE key = 'buffer_ratio_tight'");
+  static async getThresholds() {
+    const onTrackSetting = await db.get("SELECT value FROM system_settings WHERE key = 'buffer_ratio_on_track'");
+    const tightSetting = await db.get("SELECT value FROM system_settings WHERE key = 'buffer_ratio_tight'");
     return {
       onTrack: onTrackSetting ? parseFloat(onTrackSetting.value) : 1.15,
       tight: tightSetting ? parseFloat(tightSetting.value) : 1.00
@@ -21,9 +21,9 @@ export class ProgressionService {
   /**
    * Get active simulation date or fallback to current local date
    */
-  static getToday(asOfDate = null) {
+  static async getToday(asOfDate = null) {
     if (asOfDate) return asOfDate;
-    const simSetting = db.get("SELECT value FROM system_settings WHERE key = 'simulation_date'");
+    const simSetting = await db.get("SELECT value FROM system_settings WHERE key = 'simulation_date'");
     if (simSetting && simSetting.value) {
       return simSetting.value;
     }
@@ -34,8 +34,8 @@ export class ProgressionService {
    * Automatically generate and assign planned topic dates for a subject
    * Based on semester start date, timetable slots, working Saturday rules, and holidays.
    */
-  static generatePlannedTopicDates(subjectId) {
-    const subject = db.get(`
+  static async generatePlannedTopicDates(subjectId) {
+    const subject = await db.get(`
       SELECT s.*, sem.start_date as semester_start, sem.end_date as semester_end,
              sem.working_saturday_rule, sem.target_finish_date
       FROM subjects s
@@ -46,14 +46,14 @@ export class ProgressionService {
     if (!subject) throw new Error(`Subject with ID ${subjectId} not found`);
 
     // Fetch campus holidays
-    const holidaysRows = db.query(`
+    const holidaysRows = await db.query(`
       SELECT event_date FROM calendar_events
       WHERE campus_id = ? AND semester_id = ? AND event_type = 'HOLIDAY' AND affects_schedule = 1
     `, [subject.campus_id, subject.semester_id]);
     const holidaySet = new Set(holidaysRows.map(h => h.event_date));
 
     // Fetch timetable slots for this subject
-    const timetableSlots = db.query(`
+    const timetableSlots = await db.query(`
       SELECT weekday, duration_hours, start_time
       FROM timetable_slots
       WHERE subject_id = ?
@@ -74,7 +74,7 @@ export class ProgressionService {
     }
 
     // Fetch topics in sequence order
-    const topics = db.query(`
+    const topics = await db.query(`
       SELECT id, sequence_order, planned_hours, status
       FROM lesson_plans
       WHERE subject_id = ?
@@ -84,7 +84,7 @@ export class ProgressionService {
     if (topics.length === 0) return;
 
     // Check for cancelled sessions to exclude those slots from topic scheduling
-    const cancelledSessions = db.query(`
+    const cancelledSessions = await db.query(`
       SELECT session_date FROM teaching_sessions
       WHERE subject_id = ? AND status = 'CANCELLED'
     `, [subjectId]);
@@ -146,9 +146,9 @@ export class ProgressionService {
     }
 
     // Update lesson_plans with calculated planned_date
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const [topicId, pDate] of topicDates.entries()) {
-        tx.run(`UPDATE lesson_plans SET planned_date = ? WHERE id = ?`, [pDate, topicId]);
+        await tx.run(`UPDATE lesson_plans SET planned_date = ? WHERE id = ?`, [pDate, topicId]);
       }
     });
   }
@@ -156,11 +156,11 @@ export class ProgressionService {
   /**
    * Calculate complete progression metrics for a specific subject
    */
-  static calculateSubjectProgress(subjectId, asOfDate = null) {
-    const today = this.getToday(asOfDate);
-    const thresholds = this.getThresholds();
+  static async calculateSubjectProgress(subjectId, asOfDate = null) {
+    const today = await this.getToday(asOfDate);
+    const thresholds = await this.getThresholds();
 
-    const subject = db.get(`
+    const subject = await db.get(`
       SELECT s.*, sem.start_date as semester_start, sem.end_date as semester_end,
              sem.working_saturday_rule, sem.target_finish_date,
              c.name as campus_name, t.name as track_name, sem.batch_name,
@@ -176,7 +176,7 @@ export class ProgressionService {
     if (!subject) throw new Error(`Subject ${subjectId} not found`);
 
     // Fetch all topics for subject
-    const topics = db.query(`
+    const topics = await db.query(`
       SELECT id, topic_title, planned_hours, status, completion_percentage, planned_date, exam_scope
       FROM lesson_plans
       WHERE subject_id = ?
@@ -240,13 +240,13 @@ export class ProgressionService {
 
     // E. AVAILABLE HOURS:
     // Timetable hours remaining between today and target_finish_date (inclusive)
-    const holidaysRows = db.query(`
+    const holidaysRows = await db.query(`
       SELECT event_date FROM calendar_events
       WHERE campus_id = ? AND semester_id = ? AND event_type = 'HOLIDAY' AND affects_schedule = 1
     `, [subject.campus_id, subject.semester_id]);
     const holidaySet = new Set(holidaysRows.map(h => h.event_date));
 
-    const timetableSlots = db.query(`
+    const timetableSlots = await db.query(`
       SELECT weekday, duration_hours
       FROM timetable_slots
       WHERE subject_id = ?
@@ -275,7 +275,7 @@ export class ProgressionService {
             // If evaluating today, subtract hours from sessions already logged for this subject today
             // to avoid double-counting completed sessions as future available capacity
             if (cur === today) {
-              const loggedToday = db.get(`
+              const loggedToday = await db.get(`
                 SELECT COALESCE(SUM(duration_hours), 0) as logged_hours
                 FROM teaching_sessions
                 WHERE subject_id = ? AND session_date = ? AND status != 'CANCELLED'
@@ -371,9 +371,9 @@ export class ProgressionService {
   /**
    * Get Exam Readiness for a semester or subject
    */
-  static getExamReadiness(semesterId, subjectId = null, asOfDate = null) {
-    const today = this.getToday(asOfDate);
-    const thresholds = this.getThresholds();
+  static async getExamReadiness(semesterId, subjectId = null, asOfDate = null) {
+    const today = await this.getToday(asOfDate);
+    const thresholds = await this.getThresholds();
 
     // Fetch exams for this semester
     let examsQuery = `
@@ -383,7 +383,7 @@ export class ProgressionService {
       WHERE ew.semester_id = ?
       ORDER BY ew.start_date ASC
     `;
-    const exams = db.query(examsQuery, [semesterId]);
+    const exams = await db.query(examsQuery, [semesterId]);
 
     // Subjects in scope
     let subjectsQuery = `SELECT id, code, name, semester_id, campus_id FROM subjects WHERE semester_id = ?`;
@@ -392,13 +392,13 @@ export class ProgressionService {
       subjectsQuery += ` AND id = ?`;
       subjectsParams.push(subjectId);
     }
-    const subjects = db.query(subjectsQuery, subjectsParams);
+    const subjects = await db.query(subjectsQuery, subjectsParams);
 
     const results = [];
 
     for (const exam of exams) {
       // Holidays
-      const holidaysRows = db.query(`
+      const holidaysRows = await db.query(`
         SELECT event_date FROM calendar_events
         WHERE campus_id = ? AND semester_id = ? AND event_type = 'HOLIDAY' AND affects_schedule = 1
       `, [exam.campus_id, exam.semester_id]);
@@ -412,7 +412,7 @@ export class ProgressionService {
       for (const subj of subjects) {
         // Topics applicable to this exam:
         // exam_scope can be exact exam_type or 'ALL'
-        const inScopeTopics = db.query(`
+        const inScopeTopics = await db.query(`
           SELECT id, topic_title, planned_hours, status, completion_percentage
           FROM lesson_plans
           WHERE subject_id = ? AND (exam_scope = ? OR exam_scope = 'ALL')
@@ -439,7 +439,7 @@ export class ProgressionService {
         let subjAvailHours = 0;
 
         if (today <= dayBeforeExam) {
-          const timetableSlots = db.query(`
+          const timetableSlots = await db.query(`
             SELECT weekday, duration_hours FROM timetable_slots WHERE subject_id = ?
           `, [subj.id]);
           const slotMap = {};
@@ -454,7 +454,7 @@ export class ProgressionService {
               if (slotMap[dow]) {
                 let dayHours = slotMap[dow];
                 if (cur === today) {
-                  const loggedToday = db.get(`
+                  const loggedToday = await db.get(`
                     SELECT COALESCE(SUM(duration_hours), 0) as logged_hours
                     FROM teaching_sessions
                     WHERE subject_id = ? AND session_date = ? AND status != 'CANCELLED'

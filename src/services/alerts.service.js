@@ -13,11 +13,11 @@ export class AlertsService {
    * Generates reminders for Faculty and escalations for Campus Managers.
    * @param {string} asOfDate - Optional simulation date YYYY-MM-DD
    */
-  static checkMissedLogs(asOfDate = null) {
-    const today = asOfDate || this.getActiveDate();
+  static async checkMissedLogs(asOfDate = null) {
+    const today = asOfDate || (await this.getActiveDate());
 
     // Fetch active semesters
-    const activeSemesters = db.query(`
+    const activeSemesters = await db.query(`
       SELECT sem.*, c.name as campus_name
       FROM semesters sem
       JOIN campuses c ON sem.campus_id = c.id
@@ -28,14 +28,14 @@ export class AlertsService {
 
     for (const sem of activeSemesters) {
       // Holidays
-      const holidaysRows = db.query(`
+      const holidaysRows = await db.query(`
         SELECT event_date FROM calendar_events
         WHERE campus_id = ? AND semester_id = ? AND event_type = 'HOLIDAY' AND affects_schedule = 1
       `, [sem.campus_id, sem.id]);
       const holidaySet = new Set(holidaysRows.map(h => h.event_date));
 
       // Timetable slots in this semester
-      const slots = db.query(`
+      const slots = await db.query(`
         SELECT ts.*, s.code as subject_code, s.name as subject_name,
                u.name as faculty_name, u.email as faculty_email
         FROM timetable_slots ts
@@ -45,7 +45,7 @@ export class AlertsService {
       `, [sem.id]);
 
       // Find Campus Manager for this campus
-      const campusManager = db.get(`
+      const campusManager = await db.get(`
         SELECT id, name, email FROM users
         WHERE campus_id = ? AND role = 'CAMPUS_MANAGER'
         LIMIT 1
@@ -55,6 +55,30 @@ export class AlertsService {
       let checkDate = sem.start_date;
       const endDate = today < sem.end_date ? today : sem.end_date;
 
+      // Pre-fetch all logged sessions for this semester in date range (eliminates N+1 queries over remote connections)
+      const sessionsRows = await db.query(`
+        SELECT session_date, timetable_slot_id, subject_id, batch_name
+        FROM teaching_sessions
+        WHERE campus_id = ? AND session_date >= ? AND session_date <= ?
+      `, [sem.campus_id, sem.start_date, endDate]);
+
+      const sessionKeys = new Set();
+      for (const s of sessionsRows) {
+        if (s.timetable_slot_id) {
+          sessionKeys.add(`${s.session_date}_slot_${s.timetable_slot_id}`);
+        }
+        if (s.subject_id && s.batch_name) {
+          sessionKeys.add(`${s.session_date}_sub_${s.subject_id}_${s.batch_name}`);
+        }
+      }
+
+      // Pre-fetch existing alert IDs for this semester to avoid repetitive queries
+      const alertRows = await db.query(`
+        SELECT id FROM alerts
+        WHERE campus_id = ? AND session_date >= ? AND session_date <= ?
+      `, [sem.campus_id, sem.start_date, endDate]);
+      const existingAlertIds = new Set(alertRows.map(a => a.id));
+
       while (checkDate <= endDate) {
         if (CalendarService.isWorkingDay(checkDate, sem.working_saturday_rule, holidaySet)) {
           const dow = CalendarService.getDayOfWeek(checkDate);
@@ -62,16 +86,10 @@ export class AlertsService {
 
           for (const slot of daySlots) {
             // Check if a session was logged for this slot on checkDate
-            const session = db.get(`
-              SELECT id, status FROM teaching_sessions
-              WHERE session_date = ? AND (
-                timetable_slot_id = ?
-                OR (timetable_slot_id IS NULL AND subject_id = ? AND batch_name = ? AND campus_id = ?)
-              )
-              LIMIT 1
-            `, [checkDate, slot.id, slot.subject_id, slot.batch_name, sem.campus_id]);
+            const hasSession = sessionKeys.has(`${checkDate}_slot_${slot.id}`) ||
+              sessionKeys.has(`${checkDate}_sub_${slot.subject_id}_${slot.batch_name}`);
 
-            if (!session) {
+            if (!hasSession) {
               // Session was NOT logged!
               const daysDiff = CalendarService.diffInDays(checkDate, today);
               const elapsedHours = daysDiff * 24;
@@ -81,12 +99,12 @@ export class AlertsService {
                 const alertId = `alt_rem_${slot.id}_${checkDate}`;
                 const msg = `Reminder: Scheduled session for ${slot.subject_code} (${slot.start_time}-${slot.end_time}) on ${checkDate} has not been logged yet.`;
                 
-                const existing = db.get(`SELECT id FROM alerts WHERE id = ?`, [alertId]);
-                if (!existing) {
-                  db.run(`
+                if (!existingAlertIds.has(alertId)) {
+                  await db.run(`
                     INSERT INTO alerts (id, alert_type, recipient_user_id, recipient_role, campus_id, subject_id, slot_id, session_date, message, severity)
                     VALUES (?, 'MISSED_LOG_REMINDER', ?, 'FACULTY', ?, ?, ?, ?, ?, 'WARNING')
                   `, [alertId, slot.faculty_id, sem.campus_id, slot.subject_id, slot.id, checkDate, msg]);
+                  existingAlertIds.add(alertId);
                   newAlertsCreated.push({ alertId, type: 'MISSED_LOG_REMINDER', recipient: slot.faculty_name, checkDate });
                 }
               }
@@ -96,12 +114,12 @@ export class AlertsService {
                 const alertId = `alt_esc_${slot.id}_${checkDate}`;
                 const msg = `ESCALATION: Faculty ${slot.faculty_name} has not logged ${slot.subject_code} for ${slot.batch_name} scheduled on ${checkDate} (>48 hours overdue).`;
                 
-                const existing = db.get(`SELECT id FROM alerts WHERE id = ?`, [alertId]);
-                if (!existing && campusManager) {
-                  db.run(`
+                if (!existingAlertIds.has(alertId) && campusManager) {
+                  await db.run(`
                     INSERT INTO alerts (id, alert_type, recipient_user_id, recipient_role, campus_id, subject_id, slot_id, session_date, message, severity)
                     VALUES (?, 'ESCALATED_UNLOGGED', ?, 'CAMPUS_MANAGER', ?, ?, ?, ?, ?, 'DANGER')
                   `, [alertId, campusManager.id, sem.campus_id, slot.subject_id, slot.id, checkDate, msg]);
+                  existingAlertIds.add(alertId);
                   newAlertsCreated.push({ alertId, type: 'ESCALATED_UNLOGGED', recipient: campusManager.name, checkDate });
                 }
               }
@@ -118,8 +136,8 @@ export class AlertsService {
   /**
    * Get active date from system settings or real date
    */
-  static getActiveDate() {
-    const simSetting = db.get("SELECT value FROM system_settings WHERE key = 'simulation_date'");
+  static async getActiveDate() {
+    const simSetting = await db.get("SELECT value FROM system_settings WHERE key = 'simulation_date'");
     if (simSetting && simSetting.value) {
       return simSetting.value;
     }
@@ -129,31 +147,31 @@ export class AlertsService {
   /**
    * Set simulation date for time-based testing
    */
-  static setSimulationDate(dateStr) {
-    db.run(`
+  static async setSimulationDate(dateStr) {
+    await db.run(`
       INSERT INTO system_settings (key, value, description)
       VALUES ('simulation_date', ?, 'Test simulation date for alert and pace calculations')
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `, [dateStr]);
-    return this.checkMissedLogs(dateStr);
+    return await this.checkMissedLogs(dateStr);
   }
 
   /**
    * Reset simulation date back to system local date
    */
-  static clearSimulationDate() {
-    db.run(`DELETE FROM system_settings WHERE key = 'simulation_date'`);
-    return this.getActiveDate();
+  static async clearSimulationDate() {
+    await db.run(`DELETE FROM system_settings WHERE key = 'simulation_date'`);
+    return await this.getActiveDate();
   }
 
   /**
    * Fetch alerts with role/campus filtering
    */
-  static getAlerts(user) {
+  static async getAlerts(user) {
     if (!user) return [];
 
     if (user.role === 'ADMIN') {
-      return db.query(`
+      return await db.query(`
         SELECT a.*, s.code as subject_code, s.name as subject_name, c.name as campus_name
         FROM alerts a
         LEFT JOIN subjects s ON a.subject_id = s.id
@@ -164,7 +182,7 @@ export class AlertsService {
     }
 
     if (user.role === 'CAMPUS_MANAGER') {
-      return db.query(`
+      return await db.query(`
         SELECT a.*, s.code as subject_code, s.name as subject_name, c.name as campus_name
         FROM alerts a
         LEFT JOIN subjects s ON a.subject_id = s.id
@@ -176,7 +194,7 @@ export class AlertsService {
     }
 
     if (user.role === 'FACULTY') {
-      return db.query(`
+      return await db.query(`
         SELECT a.*, s.code as subject_code, s.name as subject_name, c.name as campus_name
         FROM alerts a
         LEFT JOIN subjects s ON a.subject_id = s.id
@@ -193,8 +211,8 @@ export class AlertsService {
   /**
    * Mark alert as read
    */
-  static markAsRead(alertId) {
-    return db.run(`UPDATE alerts SET is_read = 1 WHERE id = ?`, [alertId]);
+  static async markAsRead(alertId) {
+    return await db.run(`UPDATE alerts SET is_read = 1 WHERE id = ?`, [alertId]);
   }
 }
 

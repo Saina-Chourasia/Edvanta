@@ -7,24 +7,24 @@ import AlertsService from '../src/services/alerts.service.js';
 import { requireRole, preventStudentMutations } from '../src/middleware/permissions.js';
 
 describe('Requirement 14: Missed-Session Alerts & Escalations', () => {
-  test('Alerts service detects unlogged sessions and prevents duplicates', () => {
+  test('Alerts service detects unlogged sessions and prevents duplicates', async () => {
     // Run missed log check for 2026-10-19
-    const alerts1 = AlertsService.checkMissedLogs('2026-10-19');
+    const alerts1 = await AlertsService.checkMissedLogs('2026-10-19');
     // Running again should create 0 duplicates
-    const alerts2 = AlertsService.checkMissedLogs('2026-10-19');
+    const alerts2 = await AlertsService.checkMissedLogs('2026-10-19');
 
     assert.equal(alerts2.length, 0, 'Duplicate alerts must NOT be generated for previously flagged sessions');
   });
 
-  test('Simulation date setting triggers alert checks without changing system clock', () => {
+  test('Simulation date setting triggers alert checks without changing system clock', async () => {
     // Simulate future date 2026-10-25
-    AlertsService.setSimulationDate('2026-10-25');
-    const activeDate = AlertsService.getActiveDate();
+    await AlertsService.setSimulationDate('2026-10-25');
+    const activeDate = await AlertsService.getActiveDate();
     assert.equal(activeDate, '2026-10-25', 'Simulation date should reflect 2026-10-25');
 
     // Reset back to system clock
-    AlertsService.clearSimulationDate();
-    const resetDate = AlertsService.getActiveDate();
+    await AlertsService.clearSimulationDate();
+    const resetDate = await AlertsService.getActiveDate();
     assert.ok(resetDate.length === 10, 'Active date should be reset to system date format YYYY-MM-DD');
   });
 });

@@ -63,7 +63,7 @@ function parseCSV(text) {
 }
 
 // 1. Import Calendar & Holidays CSV
-router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), upload.single('file'), (req, res) => {
+router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), upload.single('file'), async (req, res) => {
   let csvContent = '';
   if (req.file) {
     csvContent = req.file.buffer.toString('utf8');
@@ -119,10 +119,10 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
 
     // Reference validation
     if (semester_id && campus_id) {
-      const sem = db.get(`SELECT id FROM semesters WHERE id = ?`, [semester_id]);
+      const sem = await db.get(`SELECT id FROM semesters WHERE id = ?`, [semester_id]);
       if (!sem) errors.push(`Row ${_rowNumber}: semester_id '${semester_id}' does not exist`);
 
-      const camp = db.get(`SELECT id FROM campuses WHERE id = ?`, [campus_id]);
+      const camp = await db.get(`SELECT id FROM campuses WHERE id = ?`, [campus_id]);
       if (!camp) errors.push(`Row ${_rowNumber}: campus_id '${campus_id}' does not exist`);
     }
 
@@ -148,9 +148,9 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
   }
 
   try {
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const rec of validRecords) {
-        tx.run(`
+        await tx.run(`
           INSERT INTO calendar_events (id, semester_id, campus_id, event_date, event_type, title, description, affects_schedule)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(campus_id, semester_id, event_date, title) DO UPDATE SET
@@ -162,9 +162,9 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
     // Recalculate schedules for affected semesters
     const semIds = [...new Set(validRecords.map(r => r.semester_id))];
     for (const semId of semIds) {
-      const subjects = db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semId]);
+      const subjects = await db.query(`SELECT id FROM subjects WHERE semester_id = ?`, [semId]);
       for (const subj of subjects) {
-        ProgressionService.generatePlannedTopicDates(subj.id);
+        await ProgressionService.generatePlannedTopicDates(subj.id);
       }
     }
 
@@ -178,7 +178,7 @@ router.post('/calendar', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), u
 });
 
 // 2. Import Timetable CSV
-router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), upload.single('file'), (req, res) => {
+router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), upload.single('file'), async (req, res) => {
   let csvContent = '';
   if (req.file) csvContent = req.file.buffer.toString('utf8');
   else if (typeof req.body.csvText === 'string') csvContent = req.body.csvText;
@@ -230,10 +230,10 @@ router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), 
     }
 
     // Lookup references
-    const subject = db.get(`SELECT id FROM subjects WHERE LOWER(code) = LOWER(?)`, [subject_code]);
+    const subject = await db.get(`SELECT id FROM subjects WHERE LOWER(code) = LOWER(?)`, [subject_code]);
     if (!subject) errors.push(`Row ${_rowNumber}: Unknown subject code '${subject_code}'`);
 
-    const faculty = db.get(`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, [faculty_email]);
+    const faculty = await db.get(`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, [faculty_email]);
     if (!faculty) errors.push(`Row ${_rowNumber}: Unknown faculty email '${faculty_email}'`);
 
     let durationHours = 0;
@@ -269,9 +269,9 @@ router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), 
   }
 
   try {
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const rec of validRecords) {
-        tx.run(`
+        await tx.run(`
           INSERT INTO timetable_slots (id, campus_id, track_id, semester_id, batch_name, subject_id, faculty_id, weekday, start_time, end_time, duration_hours, room)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(campus_id, batch_name, weekday, start_time) DO UPDATE SET
@@ -282,7 +282,7 @@ router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), 
 
     const affectedSubjectIds = [...new Set(validRecords.map(r => r.subject_id))];
     for (const sId of affectedSubjectIds) {
-      ProgressionService.generatePlannedTopicDates(sId);
+      await ProgressionService.generatePlannedTopicDates(sId);
     }
 
     res.json({
@@ -295,7 +295,7 @@ router.post('/timetable', authenticate, requireRole('ADMIN', 'CAMPUS_MANAGER'), 
 });
 
 // 3. Import Syllabus / Lesson Plans CSV
-router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
+router.post('/syllabus', authenticate, upload.single('file'), async (req, res) => {
   let csvContent = '';
   if (req.file) csvContent = req.file.buffer.toString('utf8');
   else if (typeof req.body.csvText === 'string') csvContent = req.body.csvText;
@@ -321,7 +321,7 @@ router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
   // Campus Manager boundary enforcement
   if (req.user.role === 'CAMPUS_MANAGER') {
     for (const row of rows) {
-      const subj = db.get(`SELECT campus_id FROM subjects WHERE LOWER(code) = LOWER(?)`, [row.subject_code]);
+      const subj = await db.get(`SELECT campus_id FROM subjects WHERE LOWER(code) = LOWER(?)`, [row.subject_code]);
       if (subj && subj.campus_id !== req.user.campus_id) {
         return res.status(403).json({
           error: `Access denied. Campus Manager can only import syllabus for assigned campus '${req.user.campus_id}'.`
@@ -350,7 +350,7 @@ router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
       errors.push(`Row ${_rowNumber}: exam_scope must be one of: ${validScopes.join(', ')}`);
     }
 
-    const subject = db.get(`SELECT id, faculty_id FROM subjects WHERE LOWER(code) = LOWER(?)`, [subject_code]);
+    const subject = await db.get(`SELECT id, faculty_id FROM subjects WHERE LOWER(code) = LOWER(?)`, [subject_code]);
     if (!subject) {
       errors.push(`Row ${_rowNumber}: Unknown subject code '${subject_code}'`);
     } else if (req.user.role === 'FACULTY' && subject.faculty_id !== req.user.id) {
@@ -381,9 +381,9 @@ router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
   }
 
   try {
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const rec of validRecords) {
-        tx.run(`
+        await tx.run(`
           INSERT INTO lesson_plans (id, subject_id, unit_number, unit_name, topic_number, topic_title, description, planned_hours, sequence_order, exam_scope, status, completion_percentage)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_STARTED', 0)
           ON CONFLICT(subject_id, sequence_order) DO UPDATE SET
@@ -394,7 +394,7 @@ router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
 
     const affectedSubjectIds = [...new Set(validRecords.map(r => r.subject_id))];
     for (const sId of affectedSubjectIds) {
-      ProgressionService.generatePlannedTopicDates(sId);
+      await ProgressionService.generatePlannedTopicDates(sId);
     }
 
     res.json({
@@ -407,38 +407,42 @@ router.post('/syllabus', authenticate, upload.single('file'), (req, res) => {
 });
 
 // 4. Export Progress Report to CSV
-router.get('/export/progress-report', authenticate, (req, res) => {
-  const subjects = db.query(`SELECT id FROM subjects ORDER BY code ASC`);
-  const rows = [];
+router.get('/export/progress-report', authenticate, async (req, res) => {
+  try {
+    const subjects = await db.query(`SELECT id FROM subjects ORDER BY code ASC`);
+    const rows = [];
 
-  for (const s of subjects) {
-    try {
-      const p = ProgressionService.calculateSubjectProgress(s.id);
-      rows.push([
-        p.code,
-        `"${p.name.replace(/"/g, '""')}"`,
-        `"${p.campusName}"`,
-        `"${p.trackName}"`,
-        `"${p.batchName}"`,
-        p.hoursInScope,
-        p.coveredHours,
-        p.remainingHours,
-        p.coveragePercent + '%',
-        p.availableHours,
-        p.bufferRatio,
-        p.status,
-        p.paceVsPlan,
-        p.overdueTopicsCount
-      ].join(','));
-    } catch (e) {}
+    for (const s of subjects) {
+      try {
+        const p = await ProgressionService.calculateSubjectProgress(s.id);
+        rows.push([
+          p.code,
+          `"${p.name.replace(/"/g, '""')}"`,
+          `"${p.campusName}"`,
+          `"${p.trackName}"`,
+          `"${p.batchName}"`,
+          p.hoursInScope,
+          p.coveredHours,
+          p.remainingHours,
+          p.coveragePercent + '%',
+          p.availableHours,
+          p.bufferRatio,
+          p.status,
+          p.paceVsPlan,
+          p.overdueTopicsCount
+        ].join(','));
+      } catch (e) {}
+    }
+
+    const csvHeader = 'Subject Code,Subject Name,Campus,Track,Batch,Hours In Scope,Covered Hours,Remaining Hours,Coverage %,Available Hours,Buffer Ratio,Status,Pace vs Plan,Overdue Topics\n';
+    const csvContent = csvHeader + rows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="edvanta-progress-report.csv"');
+    res.send(csvContent);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const csvHeader = 'Subject Code,Subject Name,Campus,Track,Batch,Hours In Scope,Covered Hours,Remaining Hours,Coverage %,Available Hours,Buffer Ratio,Status,Pace vs Plan,Overdue Topics\n';
-  const csvContent = csvHeader + rows.join('\n');
-
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="edvanta-progress-report.csv"');
-  res.send(csvContent);
 });
 
 // 5. Download Sample Templates

@@ -12,9 +12,9 @@ const router = Router();
  * GET /api/whatsapp/status
  * Check user's WhatsApp link status and notification preferences without exposing secrets
  */
-router.get('/status', authenticate, (req, res) => {
+router.get('/status', authenticate, async (req, res) => {
   try {
-    const status = WhatsAppService.getLinkStatus(req.user.id);
+    const status = await WhatsAppService.getLinkStatus(req.user.id);
     res.json(status);
   } catch (err) {
     res.status(500).json({ error: `Failed to retrieve WhatsApp status: ${err.message}` });
@@ -25,14 +25,14 @@ router.get('/status', authenticate, (req, res) => {
  * POST /api/whatsapp/request-code
  * Request a 10-minute one-time verification code for a phone number
  */
-router.post('/request-code', authenticate, (req, res) => {
+router.post('/request-code', authenticate, async (req, res) => {
   const { phone_number } = req.body;
   if (!phone_number || typeof phone_number !== 'string') {
     return res.status(400).json({ error: 'A valid phone number is required.' });
   }
 
   try {
-    const result = WhatsAppService.requestVerificationCode(req.user.id, phone_number);
+    const result = await WhatsAppService.requestVerificationCode(req.user.id, phone_number);
     res.status(200).json(result);
   } catch (err) {
     const status = err.status || 500;
@@ -44,14 +44,14 @@ router.post('/request-code', authenticate, (req, res) => {
  * POST /api/whatsapp/verify
  * Submit verification code to link WhatsApp account
  */
-router.post('/verify', authenticate, (req, res) => {
+router.post('/verify', authenticate, async (req, res) => {
   const { phone_number, code } = req.body;
   if (!phone_number || !code) {
     return res.status(400).json({ error: 'Both phone_number and 6-digit verification code are required.' });
   }
 
   try {
-    const result = WhatsAppService.verifyAndLink(req.user.id, phone_number, code);
+    const result = await WhatsAppService.verifyAndLink(req.user.id, phone_number, code);
     res.status(200).json(result);
   } catch (err) {
     const status = err.status || 500;
@@ -63,9 +63,9 @@ router.post('/verify', authenticate, (req, res) => {
  * POST /api/whatsapp/unlink
  * Unlink WhatsApp account
  */
-router.post('/unlink', authenticate, (req, res) => {
+router.post('/unlink', authenticate, async (req, res) => {
   try {
-    const result = WhatsAppService.unlink(req.user.id);
+    const result = await WhatsAppService.unlink(req.user.id);
     res.json(result);
   } catch (err) {
     const status = err.status || 500;
@@ -77,9 +77,9 @@ router.post('/unlink', authenticate, (req, res) => {
  * PATCH /api/whatsapp/preferences
  * Update notification consent preferences
  */
-router.patch('/preferences', authenticate, (req, res) => {
+router.patch('/preferences', authenticate, async (req, res) => {
   try {
-    const updated = WhatsAppService.updatePreferences(req.user.id, req.body);
+    const updated = await WhatsAppService.updatePreferences(req.user.id, req.body);
     res.json(updated);
   } catch (err) {
     const status = err.status || 500;

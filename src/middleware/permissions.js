@@ -47,14 +47,14 @@ export function requireCampusAccess(paramName = 'campusId') {
  * Ensure faculty can ONLY view/log sessions for subjects assigned to them.
  */
 export function requireSubjectAccess(paramName = 'subjectId') {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
     if (req.user.role === 'ADMIN') return next();
 
     const targetSubjectId = req.params[paramName] || req.body[paramName] || req.query[paramName];
     if (!targetSubjectId) return next();
 
-    const subject = db.get(`SELECT id, campus_id, faculty_id, name, code FROM subjects WHERE id = ?`, [targetSubjectId]);
+    const subject = await db.get(`SELECT id, campus_id, faculty_id, name, code FROM subjects WHERE id = ?`, [targetSubjectId]);
     if (!subject) {
       return res.status(404).json({ error: `Subject ${targetSubjectId} not found.` });
     }
