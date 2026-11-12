@@ -2,7 +2,23 @@
 // Connects frontend to the Express REST API with JWT authentication
 
 const API = {
-  baseUrl: '',
+  // Production-ready API URL resolution (supporting Vercel Frontend + Render Backend deployment)
+  baseUrl: (typeof window !== 'undefined' && (window.__EDVANTA_API_URL__ || window.EDVANTA_API_URL || localStorage.getItem('edvanta_api_url'))) || '',
+
+  setBaseUrl(url) {
+    this.baseUrl = (url || '').replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+      if (this.baseUrl) {
+        localStorage.setItem('edvanta_api_url', this.baseUrl);
+      } else {
+        localStorage.removeItem('edvanta_api_url');
+      }
+    }
+  },
+
+  async getHealth() {
+    return this.request('/api/health');
+  },
 
   getToken() {
     const fromStorage = localStorage.getItem('edvanta_token') || sessionStorage.getItem('edvanta_token');

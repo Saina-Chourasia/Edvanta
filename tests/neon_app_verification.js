@@ -20,7 +20,7 @@ async function runVerification() {
 
   // 1. Verify Active Engine
   console.log('\n--- 1. Database Adapter & Configuration ---');
-  console.log('• Database Engine       :', db.isPostgres ? 'PostgreSQL (Neon Serverless)' : 'SQLite');
+  console.log('• Database Engine       :', 'PostgreSQL (Neon Serverless)');
   console.log('• DATABASE_URL Configured:', Boolean(process.env.DATABASE_URL));
   if (!db.isPostgres) {
     throw new Error('FAIL: Application is NOT running on PostgreSQL!');

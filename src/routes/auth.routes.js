@@ -553,7 +553,7 @@ router.get('/google/callback', async (req, res) => {
         const assignedCampus = matched.campus_id || 'camp_hitech';
         const assignedBatch = assignedRole === 'STUDENT' ? (matched.batch_name || 'Batch-2026-Mirai-A') : null;
 
-        // Ensure record exists in SQLite for session & RBAC integrity
+        // Ensure record exists in PostgreSQL database for session & RBAC integrity
         const existingRecord = await db.get(`SELECT id FROM users WHERE LOWER(email) = ?`, [verifiedEmail]);
         if (existingRecord) {
           user = await db.get(`

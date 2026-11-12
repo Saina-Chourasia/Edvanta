@@ -40,7 +40,29 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : [];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.trim());
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow non-browser requests, same-origin, or localhost
+    if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return callback(null, true);
+    }
+    // Allow any explicitly configured origin or Vercel preview/production deployments
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -53,7 +75,8 @@ app.get('/api/health', async (req, res) => {
     const isHealthy = await db.checkHealth();
     res.json({
       status: isHealthy ? 'healthy' : 'degraded',
-      engine: db.isPostgres ? 'postgresql' : 'sqlite',
+      engine: 'postgresql',
+      database: 'PostgreSQL',
       system: 'EDVANTA Course Progression Tracker',
       tagline: 'Every Hour Counts, Every Goal Matters',
       timestamp: new Date().toISOString()
@@ -61,7 +84,8 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     res.status(500).json({
       status: 'unhealthy',
-      engine: db.isPostgres ? 'postgresql' : 'sqlite',
+      engine: 'postgresql',
+      database: 'PostgreSQL',
       error: err.message
     });
   }
@@ -108,7 +132,7 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     console.log(`🎯 Tagline: Every Hour Counts, Every Goal Matters.`);
     console.log(`🌐 URL: http://localhost:${PORT}`);
     console.log(`📡 REST API Health: http://localhost:${PORT}/api/health`);
-    console.log(`🗄️ Database Engine: ${db.isPostgres ? 'Neon Serverless PostgreSQL (Verified)' : 'Native SQLite (DatabaseSync)'}`);
+    console.log(`🗄️ Database Engine: PostgreSQL (Neon Serverless)`);
     console.log(`====================================================`);
     // Initialize Telegram Bot polling if explicitly enabled in environment
     TelegramService.startPolling();

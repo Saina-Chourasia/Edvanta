@@ -36,6 +36,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.bindEvents();
       this.initGreetingTimer();
 
+      // Check database health and status
+      API.getHealth().then((health) => {
+        const pill = document.getElementById('adminDatabaseStatusPill');
+        if (pill) {
+          if (health && health.status === 'healthy') {
+            pill.innerHTML = '🐘 PostgreSQL (Active)';
+            pill.style.background = 'rgba(16, 185, 129, 0.15)';
+            pill.style.color = '#059669';
+          } else {
+            pill.innerHTML = '🐘 PostgreSQL (Degraded)';
+            pill.style.background = 'rgba(239, 68, 68, 0.15)';
+            pill.style.color = '#DC2626';
+          }
+        }
+      }).catch(() => {});
+
       // Check URL query parameters for Google OAuth callback results or error notifications
       const urlParams = new URLSearchParams(window.location.search);
       const authError = urlParams.get('auth_error');

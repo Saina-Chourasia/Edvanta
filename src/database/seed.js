@@ -14,7 +14,7 @@ export async function seedDatabase() {
 
   const passwordHash = await bcrypt.hash('edvanta123', 10);
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     // 1. Campuses (Reconciled with HI-Tech, Rathinam, Jagannath, RGIB)
     const campuses = [
       { id: 'camp_hitech', name: 'HI-Tech Campus', code: 'HIT', timezone: 'Asia/Kolkata' },
@@ -24,7 +24,7 @@ export async function seedDatabase() {
     ];
 
     for (const c of campuses) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO campuses (id, name, code, timezone)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, code=excluded.code
@@ -38,7 +38,7 @@ export async function seedDatabase() {
     ];
 
     for (const t of tracks) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO tracks (id, name, code, description)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description
@@ -54,7 +54,7 @@ export async function seedDatabase() {
     ];
 
     for (const s of settings) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO system_settings (key, value, description)
         VALUES (?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET value=excluded.value
@@ -203,7 +203,7 @@ export async function seedDatabase() {
     ];
 
     for (const u of users) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO users (id, email, phone, password_hash, name, role, campus_id, batch_name)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET email=excluded.email, phone=excluded.phone, name=excluded.name, role=excluded.role,
@@ -264,7 +264,7 @@ export async function seedDatabase() {
     ];
 
     for (const sem of semesters) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO semesters (id, name, campus_id, track_id, batch_name, start_date, end_date, working_saturday_rule, target_finish_date, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, start_date=excluded.start_date, end_date=excluded.end_date,
@@ -285,7 +285,7 @@ export async function seedDatabase() {
 
     for (const h of holidays) {
       const hId = `ev_${h.campus_id}_${h.event_date}`;
-      tx.run(`
+      await tx.run(`
         INSERT INTO calendar_events (id, semester_id, campus_id, event_date, event_type, title, description, affects_schedule)
         VALUES (?, ?, ?, ?, ?, ?, 'Official Gazetted Holiday', ?)
         ON CONFLICT(campus_id, semester_id, event_date, title) DO NOTHING
@@ -301,7 +301,7 @@ export async function seedDatabase() {
     ];
 
     for (const e of exams) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO exam_windows (id, semester_id, exam_type, name, start_date, end_date, weightage)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, start_date=excluded.start_date, end_date=excluded.end_date, weightage=excluded.weightage
@@ -402,7 +402,7 @@ export async function seedDatabase() {
     ];
 
     for (const s of subjects) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO subjects (id, semester_id, campus_id, track_id, code, name, planned_total_hours, faculty_id, color)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET name=excluded.name, code=excluded.code, faculty_id=excluded.faculty_id,
@@ -447,10 +447,10 @@ export async function seedDatabase() {
       { id: 'slot_cs301_tue', campus_id: 'camp_hitech', track_id: 'track_mirai', semester_id: 'sem_hitech_mirai_a', batch_name: 'Batch-2026-Mirai-A', subject_id: 'subj_cs301', faculty_id: 'usr_fac_thorne', weekday: 2, start_time: '15:00', end_time: '15:50', room: 'Cloud-Lab' }
     ];
 
-    tx.run("DELETE FROM timetable_slots WHERE semester_id = 'sem_hitech_mirai_a'");
+    await tx.run("DELETE FROM timetable_slots WHERE semester_id = 'sem_hitech_mirai_a'");
     for (const slot of slots) {
       const dur = CalendarService.calculateDurationHours(slot.start_time, slot.end_time);
-      tx.run(`
+      await tx.run(`
         INSERT INTO timetable_slots (id, campus_id, track_id, semester_id, batch_name, subject_id, faculty_id, weekday, start_time, end_time, duration_hours, room)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [slot.id, slot.campus_id, slot.track_id, slot.semester_id, slot.batch_name, slot.subject_id, slot.faculty_id, slot.weekday, slot.start_time, slot.end_time, dur, slot.room]);
@@ -488,7 +488,7 @@ export async function seedDatabase() {
           { unit: 2, unitName: 'JavaScript Deep Dive', seq: 6, title: 'DOM Virtualization & Client-Side State Architectures', hours: 3.5, scope: 'MID_TERM', status: 'IN_PROGRESS', pct: 75 },
           { unit: 3, unitName: 'Backend & APIs', seq: 7, title: 'Node.js Core Modules & Express Router Pipelines', hours: 3.0, scope: 'PUT', status: 'NOT_STARTED', pct: 0 },
           { unit: 3, unitName: 'Backend & APIs', seq: 8, title: 'RESTful API Standards, JWT Authentication & CORS', hours: 3.5, scope: 'PUT', status: 'NOT_STARTED', pct: 0 },
-          { unit: 3, unitName: 'Backend & APIs', seq: 9, title: 'Relational Database Schema & SQLite WAL Mode', hours: 3.5, scope: 'PUT', status: 'NOT_STARTED', pct: 0 },
+          { unit: 3, unitName: 'Backend & APIs', seq: 9, title: 'Relational Database Schema & PostgreSQL Connection Pooling', hours: 3.5, scope: 'PUT', status: 'NOT_STARTED', pct: 0 },
           { unit: 4, unitName: 'Production & Full-Stack', seq: 10, title: 'Real-Time WebSockets & Server-Sent Events', hours: 4.0, scope: 'END_TERM', status: 'NOT_STARTED', pct: 0 },
           { unit: 4, unitName: 'Production & Full-Stack', seq: 11, title: 'Security Best Practices: XSS, CSRF & SQL Injection', hours: 4.0, scope: 'END_TERM', status: 'NOT_STARTED', pct: 0 },
           { unit: 4, unitName: 'Production & Full-Stack', seq: 12, title: 'Docker Containerization & Production CI/CD', hours: 6.0, scope: 'END_TERM', status: 'NOT_STARTED', pct: 0 }
@@ -582,7 +582,7 @@ export async function seedDatabase() {
     for (const group of lessonPlansData) {
       for (const t of group.topics) {
         const lpId = `lp_${group.subject_id.replace('subj_', '')}_${t.seq}`;
-        tx.run(`
+        await tx.run(`
           INSERT INTO lesson_plans (id, subject_id, unit_number, unit_name, topic_number, topic_title, description, planned_hours, sequence_order, exam_scope, status, completion_percentage)
           VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)
           ON CONFLICT(subject_id, sequence_order) DO UPDATE SET
@@ -635,7 +635,7 @@ export async function seedDatabase() {
     ];
 
     for (const s of sessions) {
-      tx.run(`
+      await tx.run(`
         INSERT INTO teaching_sessions (
           id, timetable_slot_id, subject_id, faculty_id, campus_id, batch_name,
           session_date, status, percentage_complete, topics_covered, duration_hours
@@ -647,10 +647,10 @@ export async function seedDatabase() {
 
   // Calculate planned topic dates for all subjects
   console.log('📅 Calculating automatic planned topic dates...');
-  const allSubjects = db.query('SELECT id FROM subjects');
+  const allSubjects = await db.query('SELECT id FROM subjects');
   for (const s of allSubjects) {
     try {
-      ProgressionService.generatePlannedTopicDates(s.id);
+      await ProgressionService.generatePlannedTopicDates(s.id);
     } catch (e) {
       // Slot-less subjects handled gracefully
     }
@@ -658,7 +658,7 @@ export async function seedDatabase() {
 
   // Scan missed logs
   console.log('🚨 Scanning missed log alerts...');
-  AlertsService.checkMissedLogs('2026-10-19');
+  await AlertsService.checkMissedLogs('2026-10-19');
 
   console.log('✅ EDVANTA database seeded successfully with MSOT academic data!');
 }

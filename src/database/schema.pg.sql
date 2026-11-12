@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- EDVANTA Course Progression Tracker - PostgreSQL / Neon DDL Schema
 -- Compatible with PostgreSQL 15+ and Neon Serverless Postgres
--- Translates SQLite types to robust PostgreSQL enterprise standards:
+-- Implements robust PostgreSQL enterprise standards:
 --   TEXT -> VARCHAR(n) / TEXT
 --   DATETIME -> TIMESTAMPTZ (with timezone awareness)
 --   DATE strings -> DATE

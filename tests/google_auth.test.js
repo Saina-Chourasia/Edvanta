@@ -263,7 +263,7 @@ describe('Priority 3: Real Google OAuth 2.0 / OpenID Connect Authentication Test
 
       // Verify the user is created with role STUDENT, NOT automatically ADMIN
       const createdUser = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [testEmail.toLowerCase()]);
-      assert.ok(createdUser, 'User record must exist in SQLite for session integrity');
+      assert.ok(createdUser, 'User record must exist in PostgreSQL for session integrity');
       assert.equal(createdUser.role, 'STUDENT', 'Allowlisted email must NOT automatically receive ADMIN privileges');
     } finally {
       global.fetch = originalFetch;

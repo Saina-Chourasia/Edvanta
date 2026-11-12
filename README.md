@@ -24,8 +24,6 @@ The platform bridges the gap between planned curriculum delivery and actual clas
 
 ```
 edvanta/
-├── data/                  # Persistent SQLite database storage (WAL mode)
-│   └── edvanta.db
 ├── public/                # Mobile-first frontend SPA
 │   ├── css/
 │   │   └── styles.css     # Dark glassmorphic design system
@@ -35,8 +33,8 @@ edvanta/
 │   └── index.html         # Responsive semantic UI
 ├── src/
 │   ├── database/
-│   │   ├── db.js          # Synchronous SQLite abstraction & transaction manager
-│   │   ├── schema.sql     # Database schema, foreign keys & indexes
+│   │   ├── db.js          # PostgreSQL abstraction, pool manager & transactions
+│   │   ├── schema.pg.sql  # PostgreSQL DDL schema, foreign keys & indexes
 │   │   └── seed.js        # Realistic sample dataset across 4 campuses
 │   ├── middleware/
 │   │   ├── auth.js        # JWT token verification
@@ -70,8 +68,8 @@ edvanta/
 ```
 
 ### Technology Stack:
-- **Backend**: Node.js (v24), Express.js (v5), REST APIs
-- **Database**: SQLite via Node's native `node:sqlite` (`DatabaseSync` engine) with Write-Ahead Logging (WAL) and atomic transactions
+- **Backend**: Node.js (v22+), Express.js (v5), REST APIs
+- **Database**: PostgreSQL via `pg` connection pool with SSL and atomic transactions
 - **Security**: JWT authentication (`jsonwebtoken`), Bcrypt password hashing (`bcryptjs`)
 - **Frontend**: HTML5, Vanilla CSS3 (Custom Dark Glassmorphic Design System), Vanilla ES6 JavaScript, Chart.js
 - **Testing**: Node's native test runner (`node --test`)
@@ -199,4 +197,4 @@ Located under the **⚡ Fast Session Logger** tab:
   - `GET /api/exports/export/template/syllabus`
 - Full Progress Report download:
   - `GET /api/exports/export/progress-report`
-- Uploads are validated row-by-row and wrapped in SQLite database transactions (`BEGIN IMMEDIATE TRANSACTION ... COMMIT / ROLLBACK`).
+- Uploads are validated row-by-row and wrapped in PostgreSQL database transactions (`BEGIN ... COMMIT / ROLLBACK`).
